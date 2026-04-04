@@ -1,0 +1,27 @@
+Semantic_ID,Aspect,n_pois,Top1_name,Top1,Top2_name,Top2,Top3_name,Top3,Top4_name,Top4,Top5_name,Top5,Others
+5-7,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-7,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-28,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-28,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-42,Category,2,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-42,Region,2,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-51,Category,4,Health & Medical,50.0,Hiking,25.0,Hotels & Travel,25.0,,0.0,,0.0,0.0
+5-51,Region,4,Santa Barbara,75.0,Montecito,25.0,,0.0,,0.0,,0.0,0.0
+5-55,Category,2,Seafood Markets,50.0,Restaurants,50.0,,0.0,,0.0,,0.0,0.0
+5-55,Region,2,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-63,Category,4,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-63,Region,4,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-67,Category,2,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-67,Region,2,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-87,Category,1,Counseling & Mental Health,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-87,Region,1,Carpinteria,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-90,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-90,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-92,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-92,Region,1,Goleta,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-97,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-97,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-104,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-104,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-107,Category,1,Fitness & Instruction,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+5-107,Region,1,Isla Vista,100.0,,0.0,,0.0,,0.0,,0.0,0.0

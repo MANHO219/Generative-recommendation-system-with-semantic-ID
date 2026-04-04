@@ -1,0 +1,33 @@
+Semantic_ID,Aspect,n_pois,Top1_name,Top1,Top2_name,Top2,Top3_name,Top3,Top4_name,Top4,Top5_name,Top5,Others
+3-15,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-15,Region,1,Goleta,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-27,Category,2,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-27,Region,2,Santa Barbara,50.0,Montecito,50.0,,0.0,,0.0,,0.0,0.0
+3-29,Category,2,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-29,Region,2,Santa Barbara,50.0,Goleta,50.0,,0.0,,0.0,,0.0,0.0
+3-30,Category,6,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-30,Region,6,Santa Barbara,83.3,Goleta,16.7,,0.0,,0.0,,0.0,0.0
+3-34,Category,5,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-34,Region,5,Santa Barbara,60.0,Goleta,40.0,,0.0,,0.0,,0.0,0.0
+3-44,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-44,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-49,Category,3,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-49,Region,3,Santa Barbara,66.7,Goleta,33.3,,0.0,,0.0,,0.0,0.0
+3-50,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-50,Region,1,Carpinteria,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-58,Category,4,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-58,Region,4,Santa Barbara,75.0,Goleta,25.0,,0.0,,0.0,,0.0,0.0
+3-60,Category,2,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-60,Region,2,Santa Barbara,50.0,Goleta,50.0,,0.0,,0.0,,0.0,0.0
+3-64,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-64,Region,1,Goleta,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-78,Category,1,Arts & Entertainment,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-78,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-84,Category,5,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-84,Region,5,Santa Barbara,40.0,Isla Vista,40.0,Carpinteria,20.0,,0.0,,0.0,0.0
+3-100,Category,3,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-100,Region,3,Santa Barbara,66.7,Goleta,33.3,,0.0,,0.0,,0.0,0.0
+3-108,Category,2,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-108,Region,2,Carpinteria,50.0,Santa Barbara,50.0,,0.0,,0.0,,0.0,0.0
+3-120,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-120,Region,1,Montecito,100.0,,0.0,,0.0,,0.0,,0.0,0.0

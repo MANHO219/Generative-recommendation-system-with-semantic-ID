@@ -1,0 +1,33 @@
+Semantic_ID,Aspect,n_pois,Top1_name,Top1,Top2_name,Top2,Top3_name,Top3,Top4_name,Top4,Top5_name,Top5,Others
+2-15,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-15,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-29,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-29,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-34,Category,2,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-34,Region,2,Goleta,50.0,Santa Barbara,50.0,,0.0,,0.0,,0.0,0.0
+2-40,Category,2,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-40,Region,2,Santa Barbara,50.0,Goleta,50.0,,0.0,,0.0,,0.0,0.0
+2-44,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-44,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-57,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-57,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-58,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-58,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-64,Category,2,Restaurants,50.0,Food,50.0,,0.0,,0.0,,0.0,0.0
+2-64,Region,2,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-74,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-74,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-85,Category,5,Food,80.0,Restaurants,20.0,,0.0,,0.0,,0.0,0.0
+2-85,Region,5,Santa Barbara,60.0,Isla Vista,20.0,Carpinteria,20.0,,0.0,,0.0,0.0
+2-86,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-86,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-89,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-89,Region,1,Goleta,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-93,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-93,Region,1,Goleta,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-110,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-110,Region,1,Goleta,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-119,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-119,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-122,Category,1,Pop-Up Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-122,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0

@@ -1,0 +1,37 @@
+Semantic_ID,Aspect,n_pois,Top1_name,Top1,Top2_name,Top2,Top3_name,Top3,Top4_name,Top4,Top5_name,Top5,Others
+2-1-103,Category,1,Bars,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-1-103,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-9-116,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-9-116,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-9-127,Category,4,Hotels & Travel,75.0,Hotels,25.0,,0.0,,0.0,,0.0,0.0
+2-9-127,Region,4,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-28-10,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-28-10,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-28-127,Category,1,Hotels,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-28-127,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-58-56,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-58-56,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-58-99,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-58-99,Region,1,Montecito,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-66-87,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-66-87,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-66-123,Category,1,Event Planning & Services,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-66-123,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-70-106,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-70-106,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-77-56,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-77-56,Region,1,Carpinteria,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-81-61,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-81-61,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-86-88,Category,2,Hotels,50.0,Hotels & Travel,50.0,,0.0,,0.0,,0.0,0.0
+2-86-88,Region,2,Santa Barbara,50.0,Goleta,50.0,,0.0,,0.0,,0.0,0.0
+2-86-99,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-86-99,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-91-46,Category,2,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-91-46,Region,2,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-113-7,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-113-7,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-113-77,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-113-77,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-113-110,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-113-110,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0

@@ -1,0 +1,43 @@
+# 模型和检查点
+checkpoints/
+models/
+
+# 数据目录（原始数据太大）
+data/
+dataset/yelp/
+*.pdf
+
+# 输出（训练产物，可重新生成）
+output/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OMC / Claude
+.omc/
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.log

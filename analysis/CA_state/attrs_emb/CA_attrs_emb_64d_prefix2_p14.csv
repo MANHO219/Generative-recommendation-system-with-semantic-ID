@@ -1,0 +1,35 @@
+Semantic_ID,Aspect,n_pois,Top1_name,Top1,Top2_name,Top2,Top3_name,Top3,Top4_name,Top4,Top5_name,Top5,Others
+4-1,Category,6,Health & Medical,33.3,Beauty & Spas,16.7,Fitness & Instruction,16.7,Food,16.7,Shopping,16.7,0.0
+4-1,Region,6,Santa Barbara,83.3,Carpinteria,16.7,,0.0,,0.0,,0.0,0.0
+4-3,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-3,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-10,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-10,Region,1,Goleta,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-18,Category,9,Health & Medical,22.2,Hotels & Travel,22.2,Shopping,22.2,Beauty & Spas,11.1,Arts & Entertainment,11.1,11.1
+4-18,Region,9,Santa Barbara,77.8,Montecito,11.1,Carpinteria,11.1,,0.0,,0.0,0.0
+4-23,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-23,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-25,Category,1,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-25,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-41,Category,3,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-41,Region,3,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-45,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-45,Region,1,Carpinteria,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-47,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-47,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-61,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-61,Region,1,Goleta,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-62,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-62,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-65,Category,1,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-65,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-71,Category,2,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-71,Region,2,Santa Barbara,50.0,Goleta,50.0,,0.0,,0.0,,0.0,0.0
+4-83,Category,1,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-83,Region,1,Summerland,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-95,Category,5,Beauty & Spas,80.0,Shopping,20.0,,0.0,,0.0,,0.0,0.0
+4-95,Region,5,Santa Barbara,80.0,Montecito,20.0,,0.0,,0.0,,0.0,0.0
+4-101,Category,2,Beauty & Spas,50.0,Health & Medical,50.0,,0.0,,0.0,,0.0,0.0
+4-101,Region,2,Carpinteria,50.0,Santa Barbara,50.0,,0.0,,0.0,,0.0,0.0
+4-125,Category,2,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+4-125,Region,2,Carpinteria,50.0,Santa Barbara,50.0,,0.0,,0.0,,0.0,0.0

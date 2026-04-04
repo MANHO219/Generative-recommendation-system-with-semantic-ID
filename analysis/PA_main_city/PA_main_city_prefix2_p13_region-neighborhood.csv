@@ -1,0 +1,33 @@
+Semantic_ID,Aspect,n_pois,Top1_name,Top1,Top2_name,Top2,Top3_name,Top3,Top4_name,Top4,Top5_name,Top5,Others
+3-0,Category,2,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-0,Region,2,87G62V42,50.0,87G62WWV,50.0,,0.0,,0.0,,0.0,0.0
+3-6,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-6,Region,1,87G62XVG,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-9,Category,3,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-9,Region,3,87G62QPJ,33.3,87G64XCM,33.3,87G63QGV,33.3,,0.0,,0.0,0.0
+3-12,Category,7,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-12,Region,7,87G62W9R,14.3,87G62W8P,14.3,87F6XQ4X,14.3,87G62VX4,14.3,87F6WQ64,14.3,28.6
+3-28,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-28,Region,1,87F6XR2J,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-47,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-47,Region,1,87G63Q39,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-49,Category,2,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-49,Region,2,87F6WRVJ,50.0,87F6WRXM,50.0,,0.0,,0.0,,0.0,0.0
+3-62,Category,13,Restaurants,46.2,Shopping,23.1,Education,7.7,Health & Medical,7.7,Food,7.7,7.7
+3-62,Region,13,87F6XR56,7.7,87F6WRPM,7.7,87G63X4C,7.7,87F6XQ3F,7.7,87F6WRVR,7.7,61.5
+3-66,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-66,Region,1,87G62RQF,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-69,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-69,Region,1,87G62QPM,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-72,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-72,Region,1,87G62WQP,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-75,Category,1,Arts & Entertainment,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-75,Region,1,87F6XVC5,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-87,Category,11,Restaurants,63.6,Beauty & Spas,27.3,Shopping,9.1,,0.0,,0.0,0.0
+3-87,Region,11,87G62V5X,9.1,87G63R55,9.1,87F6WRMV,9.1,87G62WMH,9.1,87G63X9V,9.1,54.5
+3-95,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-95,Region,1,87F6XR3J,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-103,Category,1,Specialty Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-103,Region,1,87G62RGX,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-126,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+3-126,Region,1,87G63XWJ,100.0,,0.0,,0.0,,0.0,,0.0,0.0
