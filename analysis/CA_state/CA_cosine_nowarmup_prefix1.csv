@@ -1,0 +1,21 @@
+Semantic_ID,Aspect,n_pois,Top1_name,Top1,Top2_name,Top2,Top3_name,Top3,Top4_name,Top4,Top5_name,Top5,Others
+0,Category,22,Beauty & Spas,63.6,Barbers,22.7,Shopping,13.6,,0.0,,0.0,0.0
+0,Region,22,Santa Barbara,86.4,Carpinteria,9.1,Goleta,4.5,,0.0,,0.0,0.0
+1,Category,1070,Shopping,24.2,Restaurants,21.0,Beauty & Spas,18.5,Health & Medical,11.7,Food,7.4,17.2
+1,Region,1070,Santa Barbara,75.7,Goleta,12.6,Carpinteria,5.8,Montecito,3.1,Isla Vista,1.4,1.4
+2,Category,401,Restaurants,43.6,Shopping,17.5,Food,15.0,Beauty & Spas,5.7,Hotels & Travel,5.0,13.2
+2,Region,401,Santa Barbara,70.8,Goleta,16.2,Carpinteria,6.7,Isla Vista,3.0,Montecito,1.7,1.5
+3,Category,306,Health & Medical,28.8,Shopping,23.2,Restaurants,17.0,Beauty & Spas,8.2,Food,8.2,14.7
+3,Region,306,Santa Barbara,78.1,Goleta,13.4,Carpinteria,4.2,Montecito,1.6,Isla Vista,1.0,1.6
+4,Category,330,Restaurants,37.6,Shopping,19.7,Food,12.1,Health & Medical,8.8,Beauty & Spas,6.4,15.5
+4,Region,330,Santa Barbara,76.7,Goleta,14.8,Carpinteria,4.8,Isla Vista,1.2,Summerland,0.9,1.5
+5,Category,349,Restaurants,50.4,Food,14.3,Health & Medical,10.0,Shopping,9.5,Beauty & Spas,6.3,9.5
+5,Region,349,Santa Barbara,72.8,Goleta,13.8,Carpinteria,6.9,Isla Vista,4.0,Montecito,1.7,0.9
+6,Category,341,Restaurants,33.7,Shopping,18.5,Food,10.6,Health & Medical,10.6,Hotels & Travel,6.5,20.2
+6,Region,341,Santa Barbara,74.5,Goleta,13.8,Carpinteria,6.5,Isla Vista,2.1,Montecito,1.8,1.5
+7,Category,285,Shopping,24.2,Restaurants,18.9,Beauty & Spas,11.9,Health & Medical,10.5,Hotels & Travel,10.5,23.9
+7,Region,285,Santa Barbara,75.8,Goleta,11.9,Carpinteria,6.3,Montecito,2.1,Summerland,1.4,2.5
+8,Category,417,Restaurants,46.3,Shopping,20.1,Food,13.2,Health & Medical,7.4,Beauty & Spas,2.6,10.3
+8,Region,417,Santa Barbara,69.5,Goleta,17.3,Carpinteria,5.3,Isla Vista,4.3,Montecito,1.9,1.7
+9,Category,300,Shopping,37.3,Restaurants,13.7,Hotels & Travel,8.7,Beauty & Spas,7.0,Food,6.3,27.0
+9,Region,300,Santa Barbara,69.0,Goleta,17.0,Carpinteria,8.7,Isla Vista,1.7,Montecito,1.7,2.0

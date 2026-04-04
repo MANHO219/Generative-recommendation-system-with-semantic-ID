@@ -1,0 +1,85 @@
+Semantic_ID,Aspect,n_pois,Top1_name,Top1,Top2_name,Top2,Top3_name,Top3,Top4_name,Top4,Top5_name,Top5,Others
+1-2,Category,6,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-2,Region,6,87F6WRXJ,33.3,87G73252,16.7,87F6XR3M,16.7,87F6WRXX,16.7,87F6WRVM,16.7,0.0
+1-3,Category,5,Barbers,60.0,Beauty & Spas,20.0,Shopping,20.0,,0.0,,0.0,0.0
+1-3,Region,5,87F6XQ4X,20.0,87F6WRGM,20.0,87F6WQHC,20.0,87F6WVR3,20.0,87F6WRXQ,20.0,0.0
+1-4,Category,13,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-4,Region,13,87F6WVR2,23.1,87F6XV23,7.7,87F6WRXJ,7.7,87G62QGG,7.7,87F6WRRX,7.7,46.2
+1-6,Category,4,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-6,Region,4,87F6VQF5,25.0,87F6XV22,25.0,87F6WVV9,25.0,87G62XG5,25.0,,0.0,0.0
+1-7,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-7,Region,1,87F6WRGM,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-11,Category,2,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-11,Region,2,87F6WRXW,50.0,87F6XR2H,50.0,,0.0,,0.0,,0.0,0.0
+1-16,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-16,Region,1,87F6WRWF,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-19,Category,1,Fitness & Instruction,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-19,Region,1,87G62R58,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-24,Category,1,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-24,Region,1,87F6XR2H,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-28,Category,9,Health & Medical,88.9,Counseling & Mental Health,11.1,,0.0,,0.0,,0.0,0.0
+1-28,Region,9,87G62R66,11.1,87F6XV22,11.1,87G62W92,11.1,87F6WRXX,11.1,87G64X2R,11.1,44.4
+1-31,Category,1,Arts & Entertainment,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-31,Region,1,87F6WRPJ,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-33,Category,8,Beauty & Spas,75.0,Health & Medical,25.0,,0.0,,0.0,,0.0,0.0
+1-33,Region,8,87F6WRJP,12.5,87F6XR3R,12.5,87F6XVC7,12.5,87G63QGR,12.5,87F6WRRV,12.5,37.5
+1-34,Category,6,Health & Medical,50.0,Shopping,50.0,,0.0,,0.0,,0.0,0.0
+1-34,Region,6,87G62R54,16.7,87F6XR44,16.7,87G63Q39,16.7,87F6XR3J,16.7,87F6WRXF,16.7,16.7
+1-37,Category,3,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-37,Region,3,87F6WRWC,33.3,87F6WVR2,33.3,87F6XR27,33.3,,0.0,,0.0,0.0
+1-50,Category,2,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-50,Region,2,87F6XR2Q,50.0,87F6WRRV,50.0,,0.0,,0.0,,0.0,0.0
+1-52,Category,3,Arts & Entertainment,33.3,Kids Activities,33.3,Shopping,33.3,,0.0,,0.0,0.0
+1-52,Region,3,87F6XVG7,33.3,87F6XRH7,33.3,87F6WRHQ,33.3,,0.0,,0.0,0.0
+1-53,Category,2,Food,50.0,Shopping,50.0,,0.0,,0.0,,0.0,0.0
+1-53,Region,2,87F6WRXQ,50.0,87G63XF8,50.0,,0.0,,0.0,,0.0,0.0
+1-63,Category,4,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-63,Region,4,87F6XV86,25.0,87F6WR87,25.0,87G63W2M,25.0,87G63XHC,25.0,,0.0,0.0
+1-65,Category,5,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-65,Region,5,87F6XR34,20.0,87G62XH6,20.0,87G62QFH,20.0,87F6WRRX,20.0,87F6WRC7,20.0,0.0
+1-68,Category,1,Bars,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-68,Region,1,87F6VQH7,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-72,Category,9,Fitness & Instruction,77.8,Health & Medical,22.2,,0.0,,0.0,,0.0,0.0
+1-72,Region,9,87F6XR9Q,11.1,87F6XR79,11.1,87G722X5,11.1,87F6XVC7,11.1,87F6XR45,11.1,44.4
+1-73,Category,3,Shopping,66.7,Hotels & Travel,33.3,,0.0,,0.0,,0.0,0.0
+1-73,Region,3,87F6XR2H,33.3,87F6XR2F,33.3,87G62W49,33.3,,0.0,,0.0,0.0
+1-76,Category,14,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-76,Region,14,87F6WRHV,7.1,87G732PM,7.1,87F6XRJ7,7.1,87F6XR3R,7.1,87F6WRGM,7.1,64.3
+1-81,Category,8,Fitness & Instruction,87.5,Barre Classes,12.5,,0.0,,0.0,,0.0,0.0
+1-81,Region,8,87F6WRQH,12.5,87F6XQ4V,12.5,87F6WRVJ,12.5,87F6XVJC,12.5,87G62R66,12.5,37.5
+1-83,Category,6,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-83,Region,6,87F6WRXQ,16.7,87G64XCR,16.7,87G63XRJ,16.7,87F6WRVR,16.7,87G62WJ2,16.7,16.7
+1-84,Category,2,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-84,Region,2,87F6WRXV,50.0,87F6WVX3,50.0,,0.0,,0.0,,0.0,0.0
+1-88,Category,5,Parks,40.0,Active Life,20.0,Hotels & Travel,20.0,Races & Competitions,20.0,,0.0,0.0
+1-88,Region,5,87F6XV84,20.0,87F6XV36,20.0,87F6WRX9,20.0,87F6XR29,20.0,87G62R4C,20.0,0.0
+1-89,Category,5,Beauty & Spas,80.0,Shopping,20.0,,0.0,,0.0,,0.0,0.0
+1-89,Region,5,87F6XR2H,20.0,87F6XR2M,20.0,87G62R54,20.0,87F6XR2J,20.0,87F6WRXQ,20.0,0.0
+1-92,Category,1,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-92,Region,1,87G64X38,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-93,Category,6,Hotels,50.0,Hotels & Travel,50.0,,0.0,,0.0,,0.0,0.0
+1-93,Region,6,87F6XR7G,16.7,87F6XV35,16.7,87F6XV23,16.7,87F6XRJR,16.7,87F6XR2J,16.7,16.7
+1-95,Category,2,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-95,Region,2,87F6XQHG,50.0,87F6XR2J,50.0,,0.0,,0.0,,0.0,0.0
+1-96,Category,2,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-96,Region,2,87F6WQ4F,50.0,87F6VQH3,50.0,,0.0,,0.0,,0.0,0.0
+1-99,Category,3,Shopping,66.7,Arts & Entertainment,33.3,,0.0,,0.0,,0.0,0.0
+1-99,Region,3,87G62RQ8,33.3,87F6WRXJ,33.3,87F6XR2R,33.3,,0.0,,0.0,0.0
+1-100,Category,2,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-100,Region,2,87F6WVR2,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-104,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-104,Region,1,87F6WRXJ,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-107,Category,4,Shopping,50.0,Food,50.0,,0.0,,0.0,,0.0,0.0
+1-107,Region,4,87G62XRF,25.0,87F6WRWC,25.0,87G62Q3H,25.0,87G62V6Q,25.0,,0.0,0.0
+1-109,Category,3,Shopping,66.7,Food,33.3,,0.0,,0.0,,0.0,0.0
+1-109,Region,3,87F6XR2H,66.7,87G732MP,33.3,,0.0,,0.0,,0.0,0.0
+1-112,Category,3,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-112,Region,3,87F6WRWQ,33.3,87F6XR9F,33.3,87F6XV24,33.3,,0.0,,0.0,0.0
+1-114,Category,5,Shopping,60.0,Beauty & Spas,40.0,,0.0,,0.0,,0.0,0.0
+1-114,Region,5,87F6XR2M,40.0,87F6WRGM,20.0,87F6WRVV,20.0,87F6WRVG,20.0,,0.0,0.0
+1-115,Category,1,Barbers,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-115,Region,1,87F6WRXP,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-119,Category,7,Beauty & Spas,85.7,Barbers,14.3,,0.0,,0.0,,0.0,0.0
+1-119,Region,7,87F6WRXQ,14.3,87F6WRWJ,14.3,87F6WRMC,14.3,87F6XR2J,14.3,87F6XR4G,14.3,28.6
+1-120,Category,2,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-120,Region,2,87F6XV24,50.0,87F6WRRW,50.0,,0.0,,0.0,,0.0,0.0

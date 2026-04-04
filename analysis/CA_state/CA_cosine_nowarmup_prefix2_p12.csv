@@ -1,0 +1,21 @@
+Semantic_ID,Aspect,n_pois,Top1_name,Top1,Top2_name,Top2,Top3_name,Top3,Top4_name,Top4,Top5_name,Top5,Others
+2-0,Category,19,Health & Medical,31.6,Fitness & Instruction,15.8,Arts & Entertainment,15.8,Shopping,10.5,Beauty & Spas,10.5,15.8
+2-0,Region,19,Santa Barbara,84.2,Carpinteria,10.5,Goleta,5.3,,0.0,,0.0,0.0
+2-1,Category,46,Restaurants,71.7,Food,23.9,Specialty Food,2.2,Shopping,2.2,,0.0,0.0
+2-1,Region,46,Santa Barbara,65.2,Goleta,19.6,Isla Vista,6.5,Carpinteria,4.3,Montecito,4.3,0.0
+2-2,Category,50,Restaurants,86.0,Food,10.0,Pop-Up Restaurants,2.0,Food Trucks,2.0,,0.0,0.0
+2-2,Region,50,Santa Barbara,60.0,Goleta,28.0,Carpinteria,8.0,Isla Vista,2.0,Santa Clara,2.0,0.0
+2-3,Category,56,Restaurants,60.7,Food,33.9,Specialty Food,3.6,Shopping,1.8,,0.0,0.0
+2-3,Region,56,Santa Barbara,73.2,Goleta,16.1,Isla Vista,7.1,Montecito,1.8,Carpinteria,1.8,0.0
+2-4,Category,43,Shopping,46.5,Restaurants,11.6,Food,9.3,Hotels & Travel,9.3,Beauty & Spas,4.7,18.6
+2-4,Region,43,Santa Barbara,67.4,Goleta,16.3,Carpinteria,9.3,Isla Vista,4.7,Santa Barbra,2.3,0.0
+2-5,Category,38,Shopping,76.3,Hotels & Travel,5.3,Food,5.3,Restaurants,5.3,Arts & Entertainment,2.6,5.3
+2-5,Region,38,Santa Barbara,68.4,Carpinteria,13.2,Goleta,10.5,Montecito,2.6,Los Angeles,2.6,2.6
+2-6,Category,20,Restaurants,25.0,Shopping,20.0,Beauty & Spas,15.0,Food,15.0,Health & Medical,10.0,15.0
+2-6,Region,20,Santa Barbara,65.0,Goleta,30.0,Carpinteria,5.0,,0.0,,0.0,0.0
+2-7,Category,55,Restaurants,83.6,Food,12.7,Arts & Entertainment,1.8,Specialty Food,1.8,,0.0,0.0
+2-7,Region,55,Santa Barbara,81.8,Goleta,10.9,Carpinteria,5.5,Isla Vista,1.8,,0.0,0.0
+2-8,Category,15,Beauty & Spas,80.0,Shopping,13.3,Barbers,6.7,,0.0,,0.0,0.0
+2-8,Region,15,Santa Barbara,60.0,Goleta,20.0,Meridian,6.7,Montecito,6.7,Summerland,6.7,0.0
+2-9,Category,36,Shopping,30.6,Food,16.7,Restaurants,13.9,Health & Medical,13.9,Beauty & Spas,11.1,13.9
+2-9,Region,36,Santa Barbara,69.4,Goleta,13.9,Carpinteria,11.1,Montecito,2.8,Isla Vista,2.8,0.0

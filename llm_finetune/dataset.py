@@ -1,0 +1,361 @@
+"""
+LLM 微调数据集
+
+构建指令微调格式的训练数据
+"""
+
+import json
+import os
+import random
+from datetime import datetime
+from typing import Dict, List, Any
+import pandas as pd
+from pathlib import Path
+
+from config import DATA_CONFIG, PROMPT_TEMPLATE
+
+
+def _write_json_atomic(path: Path, data: Any) -> None:
+    temp_path = path.with_suffix(path.suffix + '.tmp')
+    with open(temp_path, 'w') as f:
+        json.dump(data, f)
+    os.replace(temp_path, path)
+
+
+class LLMFinetuneDataset:
+    """LLM 微调数据集"""
+    
+    def __init__(
+        self,
+        samples: List[Dict[str, Any]] = None,
+        dataset_dir: str = None,
+        semantic_ids_path: str = None,
+        split: str = 'train',
+        cache_dir: str = None
+    ):
+        """
+        Args:
+            samples: 直接传入样本列表 (如果已加载)
+            dataset_dir: Yelp 数据集目录 (用于从头构建)
+            semantic_ids_path: Semantic ID JSON 路径
+            split: 数据集划分 (train/val/test)
+            cache_dir: 缓存目录
+        """
+        self.split = split
+        
+        if samples is not None:
+            # 模式 1: 直接使用传入的样本
+            self.samples = samples
+        elif cache_dir and self._check_cache(cache_dir, split):
+            # 模式 2: 从缓存加载
+            self.samples = self._load_from_cache(cache_dir, split)
+        else:
+            # 模式 3: 不支持直接在 __init__ 中进行全量构建，
+            # 必须通过外部的 prepare_datasets 统一构建并缓存，
+            # 以避免由 random shuffle 导致的数据泄露或不一致。
+            raise ValueError(
+                f"No cache found for split '{split}' and no samples provided. "
+                "Please run prepare_datasets() to generate and cache the data first."
+            )
+
+    def _check_cache(self, cache_dir: str, split: str) -> bool:
+        path = Path(cache_dir) / f"{split}_samples.json"
+        return path.exists()
+
+    def _load_from_cache(self, cache_dir: str, split: str) -> List[Dict[str, Any]]:
+        path = Path(cache_dir) / f"{split}_samples.json"
+        print(f"Loading {split} samples from cache: {path}")
+        with open(path, 'r') as f:
+            return json.load(f)
+
+    def _get_time_description(self, dt: datetime) -> str:
+        """获取时间描述"""
+        hour = dt.hour
+        if 6 <= hour < 12:
+            return f"{dt.strftime('%A')}, Morning ({hour}:00)"
+        elif 12 <= hour < 18:
+            return f"{dt.strftime('%A')}, Afternoon ({hour}:00)"
+        elif 18 <= hour < 22:
+            return f"{dt.strftime('%A')}, Evening ({hour}:00)"
+        else:
+            return f"{dt.strftime('%A')}, Night ({hour}:00)"
+            
+    def _get_day_type(self, dt: datetime) -> str:
+        """获取日期类型"""
+        return 'Weekend' if dt.weekday() >= 5 else 'Weekday'
+        
+    def _get_pluscode(self, lat: float, lon: float) -> str:
+        """获取 Plus Code（简化版，使用坐标区间）"""
+        # 这里使用简化版本，实际应使用 openlocationcode 库
+        lat_code = f"{int(lat * 100) % 100:02d}"
+        lon_code = f"{int(abs(lon) * 100) % 100:02d}"
+        return f"{lat_code}{lon_code}+XX"
+        
+    def _format_history_items(self, history: List[Dict]) -> str:
+        """格式化历史访问记录"""
+        items = []
+        for idx, visit in enumerate(history, 1):
+            item = (
+                f"{idx}. {visit['business_name']} "
+                f"({visit['categories'][:50]}) - "
+                f"Rated {visit['stars']:.1f} stars - "
+                f"{visit['date'].strftime('%Y-%m-%d')}"
+            )
+            items.append(item)
+        return '\n'.join(items)
+        
+    def _get_favorite_categories(self, history: List[Dict], top_k: int = 3) -> str:
+        """获取用户最喜欢的类别"""
+        category_counts = {}
+        for visit in history:
+            cats = visit['categories'].split(', ') if visit['categories'] else []
+            for cat in cats:
+                category_counts[cat] = category_counts.get(cat, 0) + 1
+                
+        top_cats = sorted(category_counts.items(), key=lambda x: x[1], reverse=True)[:top_k]
+        return ', '.join([cat for cat, _ in top_cats]) if top_cats else 'N/A'
+        
+    def format_prompt(self, sample: Dict[str, Any]) -> str:
+        """格式化为 Llama 3 指令格式"""
+        user_info = sample['user_info']
+        history = sample['history']
+        target = sample['target']
+        
+        # 转换 date 字符串回 datetime (如果从 JSON 加载)
+        if isinstance(target['date'], str):
+            target['date'] = datetime.fromisoformat(target['date'])
+        for item in history:
+            if isinstance(item['date'], str):
+                item['date'] = datetime.fromisoformat(item['date'])
+        
+        # 构建用户画像部分
+        user_prompt = PROMPT_TEMPLATE['user_template'].format(
+            user_id=sample['user_id'][:8],  # 截断 ID
+            review_count=user_info['review_count'],
+            average_stars=user_info['average_stars'],
+            favorite_categories=self._get_favorite_categories(history)
+        )
+        
+        # 构建时空上下文
+        context_prompt = PROMPT_TEMPLATE['context_template'].format(
+            pluscode=self._get_pluscode(target['latitude'], target['longitude']),
+            time_description=self._get_time_description(target['date']),
+            day_type=self._get_day_type(target['date'])
+        )
+        
+        # 构建历史访问
+        history_prompt = PROMPT_TEMPLATE['history_template'].format(
+            count=len(history),
+            history_items=self._format_history_items(history)
+        )
+        
+        # 组合完整 prompt
+        full_prompt = (
+            f"{user_prompt}\n"
+            f"{context_prompt}\n"
+            f"{history_prompt}\n\n"
+            f"{PROMPT_TEMPLATE['instruction']}"
+        )
+        
+        return full_prompt
+        
+    def format_instruction(self, sample: Dict[str, Any]) -> Dict[str, str]:
+        """格式化为 Llama 3.1 Chat 格式"""
+        prompt = self.format_prompt(sample)
+        target_sid = sample['target_sid']
+        
+        return {
+            'messages': [
+                {'role': 'system', 'content': PROMPT_TEMPLATE['system']},
+                {'role': 'user', 'content': prompt},
+                {'role': 'assistant', 'content': target_sid}
+            ]
+        }
+        
+    def __len__(self) -> int:
+        return len(self.samples)
+        
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        sample = self.samples[idx]
+        return self.format_instruction(sample)
+
+
+class DatasetBuilder:
+    """Helper class to build and cache datasets"""
+    def __init__(self, dataset_dir, semantic_ids_path, cache_dir):
+        self.dataset_dir = Path(dataset_dir)
+        self.semantic_ids_path = semantic_ids_path
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        
+    def build_and_save(self):
+        print("Starting dataset construction...")
+        
+        # Load raw data
+        print("Loading raw data...")
+        businesses_df = pd.read_json(self.dataset_dir / 'business_poi.json', lines=True)
+        users_df = pd.read_json(self.dataset_dir / 'user_active.json', lines=True)
+        print("Loading reviews (this may take a while)...")
+        reviews_df = pd.read_json(self.dataset_dir / 'review_poi.json', lines=True)
+        reviews_df['date'] = pd.to_datetime(reviews_df['date'])
+        
+        with open(self.semantic_ids_path, 'r') as f:
+            semantic_ids = json.load(f)
+
+        # Optimize lookups
+        print("Indexing data...")
+        businesses_dict = businesses_df.set_index('business_id').to_dict('index')
+        users_dict = users_df.set_index('user_id').to_dict('index')
+        
+        # Build samples
+        print("Processing user histories and generating samples...")
+        samples = []
+        max_history = DATA_CONFIG['max_history_length']
+        
+        grouped = reviews_df.groupby('user_id')
+        total_groups = len(grouped)
+        count = 0
+        
+        for user_id, group in grouped:
+            count += 1
+            if count % 5000 == 0:
+                print(f"  Processed {count}/{total_groups} users")
+
+            # Sort by date
+            group = group.sort_values('date')
+            
+            # Build visits sequence
+            visits = []
+            for _, row in group.iterrows():
+                business_id = row['business_id']
+                if business_id not in businesses_dict:
+                    continue
+                
+                business_info = businesses_dict[business_id]
+                visits.append({
+                    'business_id': business_id,
+                    'business_name': business_info['name'],
+                    'categories': business_info.get('categories', ''),
+                    'stars': row['stars'],
+                    'date': row['date'].isoformat(),  # Serialize for JSON
+                    'latitude': business_info['latitude'],
+                    'longitude': business_info['longitude'],
+                })
+
+            if len(visits) < 2:
+                continue
+
+            # Get user info
+            if user_id not in users_dict:
+                continue
+            user_info = users_dict[user_id]
+            user_info_dict = {
+                'review_count': int(user_info['review_count']),
+                'average_stars': float(user_info['average_stars']),
+            }
+            
+            # Generate sliding window samples
+            for i in range(1, len(visits)):
+                history = visits[max(0, i-max_history):i]
+                target = visits[i]
+                
+                target_business_id = target['business_id']
+                if target_business_id not in semantic_ids:
+                    continue
+                    
+                sample = {
+                    'user_id': user_id,
+                    'user_info': user_info_dict,
+                    'history': history,
+                    'target': target,
+                    'target_sid': semantic_ids[target_business_id]
+                }
+                samples.append(sample)
+        
+        print(f"Generated {len(samples)} total samples. Splitting...")
+        
+        # Deterministic shuffle and split
+        random.seed(42)  # Ensure reproducibility
+        random.shuffle(samples)
+        
+        train_size = int(len(samples) * DATA_CONFIG['train_split'])
+        val_size = int(len(samples) * DATA_CONFIG['val_split'])
+        
+        splits = {
+            'train': samples[:train_size],
+            'val': samples[train_size:train_size+val_size],
+            'test': samples[train_size+val_size:]
+        }
+        
+        # Save cache
+        for split_name, split_samples in splits.items():
+            path = self.cache_dir / f"{split_name}_samples.json"
+            print(f"Saving {split_name} cache to {path} ({len(split_samples)} samples)...")
+            _write_json_atomic(path, split_samples)
+        
+        print("Dataset preparation complete.")
+        return splits
+
+
+def prepare_datasets():
+    """准备训练/验证/测试数据集"""
+    cache_dir = DATA_CONFIG.get('cache_dir')
+    required_splits = ['train', 'val', 'test']
+    
+    # Check if cache exists
+    cache_exists = cache_dir and all(
+        (Path(cache_dir) / f"{split}_samples.json").exists() 
+        for split in required_splits
+    )
+    
+    if cache_exists:
+        print(f"Found cached datasets in {cache_dir}. Loading...")
+        try:
+            train_dataset = LLMFinetuneDataset(split='train', cache_dir=cache_dir)
+            val_dataset = LLMFinetuneDataset(split='val', cache_dir=cache_dir)
+            test_dataset = LLMFinetuneDataset(split='test', cache_dir=cache_dir)
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError, ValueError) as err:
+            print(f"Cache load failed ({err}). Rebuilding dataset cache...")
+            for split in required_splits:
+                path = Path(cache_dir) / f"{split}_samples.json"
+                if path.exists():
+                    path.unlink()
+
+            builder = DatasetBuilder(
+                DATA_CONFIG['dataset_dir'],
+                DATA_CONFIG['semantic_ids_path'],
+                cache_dir
+            )
+            splits = builder.build_and_save()
+
+            train_dataset = LLMFinetuneDataset(samples=splits['train'], split='train')
+            val_dataset = LLMFinetuneDataset(samples=splits['val'], split='val')
+            test_dataset = LLMFinetuneDataset(samples=splits['test'], split='test')
+    else:
+        print("Cache not found or incomplete. Building dataset from scratch...")
+        builder = DatasetBuilder(
+            DATA_CONFIG['dataset_dir'],
+            DATA_CONFIG['semantic_ids_path'],
+            cache_dir
+        )
+        splits = builder.build_and_save()
+        
+        train_dataset = LLMFinetuneDataset(samples=splits['train'], split='train')
+        val_dataset = LLMFinetuneDataset(samples=splits['val'], split='val')
+        test_dataset = LLMFinetuneDataset(samples=splits['test'], split='test')
+    
+    print(f"Train samples: {len(train_dataset)}")
+    print(f"Val samples: {len(val_dataset)}")
+    print(f"Test samples: {len(test_dataset)}")
+    
+    return train_dataset, val_dataset, test_dataset
+
+
+if __name__ == '__main__':
+    # 测试数据集构建
+    train_dataset, val_dataset, test_dataset = prepare_datasets()
+    
+    # 查看样本
+    print("\n=== Sample Instruction ===")
+    sample = train_dataset[0]
+    print(json.dumps(sample, indent=2, ensure_ascii=False))

@@ -1,0 +1,67 @@
+Semantic_ID,Aspect,n_pois,Top1_name,Top1,Top2_name,Top2,Top3_name,Top3,Top4_name,Top4,Top5_name,Top5,Others
+1-0-87,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-0-87,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-5-28,Category,1,Specialty Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-5-28,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-8-75,Category,1,Surfing,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-8-75,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-10-108,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-10-108,Region,1,Goleta,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-12-63,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-12-63,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-27-64,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-27-64,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-46-93,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-46-93,Region,1,Goleta,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-48-28,Category,1,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-48-28,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-48-116,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-48-116,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-51-71,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-51-71,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-53-108,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-53-108,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-60-22,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-60-22,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-60-75,Category,1,Arts & Entertainment,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-60-75,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-63-75,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-63-75,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-68-69,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-68-69,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-70-94,Category,1,Active Life,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-70-94,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-75-93,Category,1,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-75-93,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-76-75,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-76-75,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-78-93,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-78-93,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-78-127,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-78-127,Region,1,Montecito,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-82-108,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-82-108,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-83-64,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-83-64,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-85-69,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-85-69,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-88-28,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-88-28,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-88-69,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-88-69,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-90-93,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-90-93,Region,1,Goleta,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-96-21,Category,1,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-96-21,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-96-49,Category,2,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-96-49,Region,2,Santa Barbara,50.0,Goleta,50.0,,0.0,,0.0,,0.0,0.0
+1-97-43,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-97-43,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-109-39,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-109-39,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-110-75,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-110-75,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-123-63,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-123-63,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-123-119,Category,1,Hotels & Travel,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+1-123-119,Region,1,Santa Barbara,100.0,,0.0,,0.0,,0.0,,0.0,0.0

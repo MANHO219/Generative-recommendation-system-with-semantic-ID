@@ -1,0 +1,21 @@
+# python3.10 + cuda 12.4
+# 1. 先安装 PyTorch（CUDA 12.4）
+pip install torch==2.4.0 torchvision==0.19.0 --index-url https://download.pytorch.org/whl/cu124
+
+# 2. 安装核心 AI 训练栈（顺序重要）
+pip install numpy==1.26.4
+pip install transformers==4.51.3   # 最低需要 4.51.0 才支持 Qwen3 架构
+pip install accelerate==1.4.0
+pip install peft==0.15.2
+pip install bitsandbytes==0.44.1
+pip install trl==0.16.1
+pip install rich>=13.0.0           # trl 隐式依赖
+pip install datasets==4.6.1        # 随 transformers 4.51+ 自动升级
+
+# 3. 数据与工具
+pip install pandas==2.2.2 pyarrow==23.0.1
+pip install tensorboard==2.17.1 matplotlib==3.9.2
+pip install openlocationcode==1.0.1 tqdm==4.66.5 einops==0.8.0
+
+# Flash Attention（需从预编译 wheel 安装，见 README）
+# pip install "flash_attn-2.8.3+cu12torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl"

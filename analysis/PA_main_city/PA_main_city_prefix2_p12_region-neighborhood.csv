@@ -1,0 +1,45 @@
+Semantic_ID,Aspect,n_pois,Top1_name,Top1,Top2_name,Top2,Top3_name,Top3,Top4_name,Top4,Top5_name,Top5,Others
+2-0,Category,2,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-0,Region,2,87G62VRF,50.0,87F6XVHF,50.0,,0.0,,0.0,,0.0,0.0
+2-2,Category,3,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-2,Region,3,87G63W2M,33.3,87G732J4,33.3,87F6WR8F,33.3,,0.0,,0.0,0.0
+2-11,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-11,Region,1,87F6WRXJ,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-17,Category,11,Health & Medical,36.4,Restaurants,27.3,Shopping,18.2,Fitness & Instruction,9.1,Beauty & Spas,9.1,0.0
+2-17,Region,11,87F6WVR2,9.1,87F6XVF4,9.1,87G62VQC,9.1,87G62V7C,9.1,87G62VWX,9.1,54.5
+2-28,Category,2,Health & Medical,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-28,Region,2,87F6WRHJ,50.0,87G63QGR,50.0,,0.0,,0.0,,0.0,0.0
+2-31,Category,1,Arts & Entertainment,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-31,Region,1,87F6WVX4,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-32,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-32,Region,1,87F6XQQ2,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-47,Category,1,Food,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-47,Region,1,87F6XR9G,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-48,Category,3,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-48,Region,3,87G63R65,33.3,87F6WVF5,33.3,87F6WRXP,33.3,,0.0,,0.0,0.0
+2-50,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-50,Region,1,87G62Q2G,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-56,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-56,Region,1,87F6WQF9,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-63,Category,1,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-63,Region,1,87F6XVF4,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-66,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-66,Region,1,87G62QFH,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-70,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-70,Region,1,87G62WJ8,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-75,Category,1,Arts & Entertainment,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-75,Region,1,87F6WRFP,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-76,Category,1,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-76,Region,1,87G63R6M,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-94,Category,20,Restaurants,45.0,Beauty & Spas,15.0,Shopping,15.0,Barbers,10.0,Health & Medical,5.0,10.0
+2-94,Region,20,87F6WRQW,5.0,87G63RF2,5.0,87G62V4V,5.0,87F6WVX4,5.0,87F6WR9R,5.0,75.0
+2-103,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-103,Region,1,87F6XRWG,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-110,Category,2,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-110,Region,2,87F6XVMJ,50.0,87G62Q9Q,50.0,,0.0,,0.0,,0.0,0.0
+2-119,Category,1,Beauty & Spas,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-119,Region,1,87F6WQ8H,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-120,Category,1,Restaurants,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-120,Region,1,87G62R57,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-126,Category,2,Shopping,100.0,,0.0,,0.0,,0.0,,0.0,0.0
+2-126,Region,2,87F6XV33,50.0,87F6WVG2,50.0,,0.0,,0.0,,0.0,0.0
