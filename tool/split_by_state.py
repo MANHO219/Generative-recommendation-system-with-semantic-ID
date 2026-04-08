@@ -5,11 +5,13 @@ split_by=state 时输出目录结构：
   {data_dir}/{STATE}/business_poi.json
   {data_dir}/{STATE}/review_poi.json
   {data_dir}/{STATE}/user_poi_interactions.json
+  {data_dir}/{STATE}/user_active.json
 
 split_by=city 时输出目录结构（需配合 --states 指定单州）：
   {data_dir}/{STATE}/{CITY}/business_poi.json
   {data_dir}/{STATE}/{CITY}/review_poi.json
   {data_dir}/{STATE}/{CITY}/user_poi_interactions.json
+  {data_dir}/{STATE}/{CITY}/user_active.json
 
 用户数据策略：截断 + 过滤短序列
   - 只保留与目标商铺有交互的记录
@@ -219,15 +221,18 @@ def split_interactions_by_key(data_dir, biz_key, keys, split_by, min_interaction
                 key_user_lines[key][obj["user_id"]].append(line)
 
     # 过滤 & 写出
+    kept_user_ids_by_key = {}
     for key in keys:
         user_map = key_user_lines[key]
         kept_users = 0
         dropped_users = 0
         out_lines = []
+        kept_user_ids = set()
         for uid, lines in user_map.items():
             if len(lines) >= min_interactions:
                 out_lines.extend(lines)
                 kept_users += 1
+                kept_user_ids.add(uid)
             else:
                 dropped_users += 1
 
@@ -235,10 +240,61 @@ def split_interactions_by_key(data_dir, biz_key, keys, split_by, min_interaction
         out_path = os.path.join(out_dir, "user_poi_interactions.json")
         with open(out_path, "w", encoding="utf-8") as f:
             f.write("\n".join(out_lines) + "\n")
+        kept_user_ids_by_key[key] = kept_user_ids
 
         info = split_key_info(key, split_by)
         label = f"{info['state']}/{info['city']}" if split_by == "city" else info["state"]
         print(f"  [{label}] interactions: 保留 {kept_users} 用户 / 丢弃 {dropped_users} 用户（< {min_interactions}）")
+
+    return kept_user_ids_by_key
+
+
+# ============================================================
+# Step 4: 按子集导出 user_active.json
+# ============================================================
+
+def split_user_active_by_key(data_dir, keys, split_by, kept_user_ids_by_key):
+    """
+    根据每个 key 在 interactions 中保留下来的用户集合，
+    从全量 user_active.json 导出子集 user_active.json。
+    """
+    user_to_keys = defaultdict(list)
+    for key in keys:
+        for user_id in kept_user_ids_by_key.get(key, set()):
+            user_to_keys[user_id].append(key)
+
+    handles = {}
+    counts = defaultdict(int)
+    src = os.path.join(data_dir, "user_active.json")
+
+    try:
+        for key in keys:
+            out_dir = make_output_dir(data_dir, key, split_by)
+            handles[key] = open(
+                os.path.join(out_dir, "user_active.json"),
+                "w", encoding="utf-8"
+            )
+
+        with open(src, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                obj = json.loads(line)
+                key_list = user_to_keys.get(obj.get("user_id", ""))
+                if not key_list:
+                    continue
+                for key in key_list:
+                    handles[key].write(line + "\n")
+                    counts[key] += 1
+    finally:
+        for h in handles.values():
+            h.close()
+
+    for key in keys:
+        info = split_key_info(key, split_by)
+        label = f"{info['state']}/{info['city']}" if split_by == "city" else info["state"]
+        print(f"  [{label}] user_active: {counts[key]} 条")
 
 
 # ============================================================
@@ -310,7 +366,14 @@ def main():
 
     # ---- Step 3: 拆分 user_poi_interactions.json ----
     print(f"=== Step 3: 拆分 user_poi_interactions.json（min_interactions={args.min_interactions}）===")
-    split_interactions_by_key(data_dir, biz_key, all_keys, split_by, args.min_interactions)
+    kept_user_ids_by_key = split_interactions_by_key(
+        data_dir, biz_key, all_keys, split_by, args.min_interactions
+    )
+    print()
+
+    # ---- Step 4: 按子集导出 user_active.json ----
+    print("=== Step 4: 拆分 user_active.json（按保留用户子集）===")
+    split_user_active_by_key(data_dir, all_keys, split_by, kept_user_ids_by_key)
     print()
 
     print("完成。")
