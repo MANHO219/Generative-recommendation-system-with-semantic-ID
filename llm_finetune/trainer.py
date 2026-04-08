@@ -191,12 +191,18 @@ class LLMFinetune:
             bnb_4bit_compute_dtype=getattr(torch, MODEL_CONFIG['bnb_4bit_compute_dtype']),
             bnb_4bit_use_double_quant=MODEL_CONFIG['bnb_4bit_use_double_quant']
         )
+
+        device_map = None
+        if torch.cuda.is_available():
+            # 4bit/8bit 量化训练时，模型加载设备必须与训练设备一致
+            # 使用 current_device() 可避免 LOCAL_RANK 与单卡运行不一致导致的报错
+            device_map = {"": torch.cuda.current_device()}
         
         # 加载模型（启用 Flash Attention 2 加速）
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_CONFIG['base_model'],
             quantization_config=bnb_config,
-            device_map={"": f"cuda:{self.accelerator.local_process_index}"} if torch.cuda.is_available() else None,
+            device_map=device_map,
             trust_remote_code=True,
             attn_implementation='flash_attention_2',
         )

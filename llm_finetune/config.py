@@ -52,8 +52,8 @@ TRAINING_CONFIG = {
 
 # 数据配置
 DATA_CONFIG = {
-    'dataset_dir': str(_BASE_DIR / 'dataset/yelp/processed'),
-    'semantic_ids_path': str(_BASE_DIR / 'output/semantic_ids.json'),
+    'dataset_dir': str(_BASE_DIR / 'dataset/yelp/processed/Philadelphia'),  # 数据集目录
+    'semantic_ids_path': str(_BASE_DIR / 'output/sid/PA_main_city/semantic_ids_v2.json'),
     'train_split': 0.8,
     'val_split': 0.1,
     'test_split': 0.1,
