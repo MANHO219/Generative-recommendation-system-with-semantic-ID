@@ -9,6 +9,7 @@ import json
 import time
 import sys
 import warnings
+import inspect
 from pathlib import Path
 from datasets import Dataset
 from transformers import (
@@ -270,36 +271,51 @@ class LLMFinetune:
         train_ds = build_hf_dataset(self.train_dataset, max_samples=50000)
         val_ds = build_hf_dataset(self.val_dataset, max_samples=10000)
         print(f"Train: {len(train_ds)} samples, Val: {len(val_ds)} samples")
-        
-        # 训练参数：trl 0.16+ 使用 SFTConfig 统一管理所有参数
-        training_args = SFTConfig(
-            output_dir=TRAINING_CONFIG['output_dir'],
-            num_train_epochs=TRAINING_CONFIG['num_train_epochs'],
-            per_device_train_batch_size=TRAINING_CONFIG['per_device_train_batch_size'],
-            per_device_eval_batch_size=TRAINING_CONFIG['per_device_eval_batch_size'],
-            gradient_accumulation_steps=TRAINING_CONFIG['gradient_accumulation_steps'],
-            learning_rate=TRAINING_CONFIG['learning_rate'],
-            warmup_steps=TRAINING_CONFIG['warmup_steps'],
-            logging_steps=TRAINING_CONFIG['logging_steps'],
-            eval_steps=TRAINING_CONFIG['eval_steps'],
-            save_steps=TRAINING_CONFIG['save_steps'],
-            bf16=TRAINING_CONFIG['bf16'],
-            optim=TRAINING_CONFIG['optim'],
-            gradient_checkpointing=TRAINING_CONFIG['gradient_checkpointing'],
-            ddp_find_unused_parameters=False,
-            remove_unused_columns=False,
-            dataloader_num_workers=4,
-            eval_strategy='steps',
-            save_strategy='steps',
-            load_best_model_at_end=True,
-            save_total_limit=TRAINING_CONFIG.get('save_total_limit', 3),
-            report_to='tensorboard',
-            logging_dir=f"{TRAINING_CONFIG['output_dir']}/logs",
-            # SFT 专属参数（trl 0.16+ 移入 SFTConfig）
-            max_seq_length=TRAINING_CONFIG['max_seq_length'],
-            dataset_text_field='text',
-            packing=True,
-        )
+
+        supported_sft_fields = set(inspect.signature(SFTConfig.__init__).parameters.keys())
+        max_seq_length = TRAINING_CONFIG.get('max_seq_length')
+        max_length = TRAINING_CONFIG.get('max_length', max_seq_length)
+
+        sft_config_kwargs = {
+            'output_dir': TRAINING_CONFIG['output_dir'],
+            'num_train_epochs': TRAINING_CONFIG['num_train_epochs'],
+            'per_device_train_batch_size': TRAINING_CONFIG['per_device_train_batch_size'],
+            'per_device_eval_batch_size': TRAINING_CONFIG['per_device_eval_batch_size'],
+            'gradient_accumulation_steps': TRAINING_CONFIG['gradient_accumulation_steps'],
+            'learning_rate': TRAINING_CONFIG['learning_rate'],
+            'warmup_steps': TRAINING_CONFIG['warmup_steps'],
+            'logging_steps': TRAINING_CONFIG['logging_steps'],
+            'eval_steps': TRAINING_CONFIG['eval_steps'],
+            'save_steps': TRAINING_CONFIG['save_steps'],
+            'bf16': TRAINING_CONFIG['bf16'],
+            'optim': TRAINING_CONFIG['optim'],
+            'gradient_checkpointing': TRAINING_CONFIG['gradient_checkpointing'],
+            'ddp_find_unused_parameters': False,
+            'remove_unused_columns': False,
+            'dataloader_num_workers': 4,
+            'eval_strategy': 'steps',
+            'save_strategy': 'steps',
+            'load_best_model_at_end': True,
+            'save_total_limit': TRAINING_CONFIG.get('save_total_limit', 3),
+            'report_to': 'tensorboard',
+            'logging_dir': f"{TRAINING_CONFIG['output_dir']}/logs",
+            'dataset_text_field': 'text',
+            'packing': True,
+        }
+
+        if 'max_seq_length' in supported_sft_fields:
+            sft_config_kwargs['max_seq_length'] = max_seq_length
+        elif 'max_length' in supported_sft_fields:
+            sft_config_kwargs['max_length'] = max_length
+
+        sft_config_kwargs = {
+            key: value
+            for key, value in sft_config_kwargs.items()
+            if key in supported_sft_fields and value is not None
+        }
+
+        # 训练参数：对不同 trl 版本做字段兼容
+        training_args = SFTConfig(**sft_config_kwargs)
 
         # 构建生成式评测 Callback
         with open(DATA_CONFIG['semantic_ids_path'], 'r', encoding='utf-8') as f:
