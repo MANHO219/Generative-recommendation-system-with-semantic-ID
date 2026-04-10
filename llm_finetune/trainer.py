@@ -8,6 +8,7 @@ import torch
 import json
 import time
 import sys
+import warnings
 from pathlib import Path
 from datasets import Dataset
 from transformers import (
@@ -30,8 +31,12 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from inference.constrained_decoding import TrieConstrainedLogitsProcessor
 from inference.trie import TokenTrie
 
-from config import MODEL_CONFIG, LORA_CONFIG, TRAINING_CONFIG, DATA_CONFIG
-from dataset import prepare_datasets
+try:
+    from .config import MODEL_CONFIG, LORA_CONFIG, TRAINING_CONFIG, DATA_CONFIG
+    from .dataset import prepare_datasets
+except ImportError:
+    from config import MODEL_CONFIG, LORA_CONFIG, TRAINING_CONFIG, DATA_CONFIG
+    from dataset import prepare_datasets
 
 
 class GenerativeEvalCallback(TrainerCallback):
@@ -198,14 +203,45 @@ class LLMFinetune:
             # 使用 current_device() 可避免 LOCAL_RANK 与单卡运行不一致导致的报错
             device_map = {"": torch.cuda.current_device()}
         
-        # 加载模型（启用 Flash Attention 2 加速）
-        model = AutoModelForCausalLM.from_pretrained(
-            MODEL_CONFIG['base_model'],
-            quantization_config=bnb_config,
-            device_map=device_map,
-            trust_remote_code=True,
-            attn_implementation='flash_attention_2',
-        )
+        requested_attn_impl = MODEL_CONFIG.get('attn_implementation', 'flash_attention_2')
+        fallback_attn_impl = MODEL_CONFIG.get('fallback_attn_implementation', 'sdpa')
+
+        def _load_with_attn(attn_impl: str):
+            kwargs = {
+                'quantization_config': bnb_config,
+                'device_map': device_map,
+                'trust_remote_code': True,
+            }
+            if attn_impl:
+                kwargs['attn_implementation'] = attn_impl
+            return AutoModelForCausalLM.from_pretrained(
+                MODEL_CONFIG['base_model'],
+                **kwargs,
+            )
+
+        try:
+            model = _load_with_attn(requested_attn_impl)
+            print(f"Attention backend: {requested_attn_impl}")
+        except Exception as err:
+            err_msg = str(err)
+            is_flash_attn_issue = (
+                requested_attn_impl == 'flash_attention_2'
+                and (
+                    'flash_attn' in err_msg
+                    or 'undefined symbol' in err_msg
+                    or 'cannot import name' in err_msg
+                )
+            )
+            if not is_flash_attn_issue:
+                raise
+
+            warnings.warn(
+                "flash_attention_2 load failed; fallback to "
+                f"'{fallback_attn_impl}'. Original error: {err_msg}",
+                RuntimeWarning,
+            )
+            model = _load_with_attn(fallback_attn_impl)
+            print(f"Attention backend: {fallback_attn_impl} (fallback)")
         
         # 准备模型进行 k-bit 训练
         model = prepare_model_for_kbit_training(model)

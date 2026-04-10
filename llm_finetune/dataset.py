@@ -12,7 +12,10 @@ from typing import Dict, List, Any
 import pandas as pd
 from pathlib import Path
 
-from config import DATA_CONFIG, PROMPT_TEMPLATE
+try:
+    from .config import DATA_CONFIG, PROMPT_TEMPLATE
+except ImportError:
+    from config import DATA_CONFIG, PROMPT_TEMPLATE
 
 
 def _write_json_atomic(path: Path, data: Any) -> None:
