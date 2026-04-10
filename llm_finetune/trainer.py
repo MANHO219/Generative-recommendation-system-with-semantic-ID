@@ -8,6 +8,7 @@ import torch
 import json
 import time
 import sys
+import re
 import warnings
 import inspect
 from pathlib import Path
@@ -40,6 +41,45 @@ except ImportError:
     from dataset import prepare_datasets
 
 
+def _is_angle_bracket_sid(sid: str) -> bool:
+    return bool(re.fullmatch(r'(<[a-d]_\d+>){3,4}', sid.strip()))
+
+
+def _to_angle_bracket_sid(sid: str) -> str:
+    sid = sid.strip()
+    if _is_angle_bracket_sid(sid):
+        return sid
+    match = re.fullmatch(r'(\d+)-(\d+)-(\d+)(?:\[([^\]]+)\])?', sid)
+    if not match:
+        return sid
+    values = [int(match.group(1)), int(match.group(2)), int(match.group(3))]
+    base_sid = ''.join(f'<{label}_{value}>' for label, value in zip(['a', 'b', 'c'], values))
+    disambig = match.group(4)
+    if disambig is None:
+        return base_sid
+    trailing_index = re.search(r'_(\d+)$', disambig)
+    if trailing_index:
+        return f'{base_sid}<d_{int(trailing_index.group(1))}>'
+    pure_number = re.fullmatch(r'\d+', disambig)
+    if pure_number:
+        return f'{base_sid}<d_{int(disambig)}>'
+    return f'{base_sid}<d_0>'
+
+
+def _apply_chat_template_no_think(tokenizer, messages, add_generation_prompt: bool) -> str:
+    kwargs = {
+        'tokenize': False,
+        'add_generation_prompt': add_generation_prompt,
+    }
+    signature = inspect.signature(tokenizer.apply_chat_template)
+    if 'enable_thinking' in signature.parameters:
+        kwargs['enable_thinking'] = False
+    rendered = tokenizer.apply_chat_template(messages, **kwargs)
+    rendered = re.sub(r'<think>[\s\S]*?</think>\s*', '', rendered)
+    rendered = rendered.replace('<think>', '').replace('</think>', '')
+    return rendered
+
+
 class GenerativeEvalCallback(TrainerCallback):
     """在每次 eval 结束后追加生成式评测指标（exact_match / hit@k / mrr@k）。"""
 
@@ -67,8 +107,11 @@ class GenerativeEvalCallback(TrainerCallback):
             messages = sample['messages']
             ground_truth = messages[-1]['content'].strip()
 
-            prompt = self.tokenizer.apply_chat_template(
-                messages[:-1], tokenize=False, add_generation_prompt=True)
+            prompt = _apply_chat_template_no_think(
+                self.tokenizer,
+                messages[:-1],
+                add_generation_prompt=True,
+            )
             inputs = self.tokenizer(prompt, return_tensors='pt').to(model.device)
             prefix_len = inputs.input_ids.shape[1]
 
@@ -138,19 +181,19 @@ class GenerativeEvalCallback(TrainerCallback):
                 pass
 
 
-def build_hf_dataset(base_dataset, max_samples=None):
+def build_hf_dataset(base_dataset, tokenizer, max_samples=None):
     """\u5c06 LLMFinetuneDataset 转换为 HuggingFace Dataset（包含格式化后的文本字段）"""
     n = min(max_samples, len(base_dataset)) if max_samples else len(base_dataset)
     texts = []
     for i in range(n):
         sample = base_dataset[i]  # 返回 {messages: [...]}
-        # 使用简单的 ChatML 格式将 messages 序列化为文本
-        parts = []
-        for msg in sample['messages']:
-            role = msg['role']
-            content = msg['content']
-            parts.append(f"<|im_start|>{role}\n{content}<|im_end|>")
-        texts.append('\n'.join(parts))
+        texts.append(
+            _apply_chat_template_no_think(
+                tokenizer,
+                sample['messages'],
+                add_generation_prompt=False,
+            )
+        )
     return Dataset.from_dict({'text': texts})
 
 
@@ -268,8 +311,8 @@ class LLMFinetune:
     def train(self):
         """开始训练"""
         print("Preparing HuggingFace datasets...")
-        train_ds = build_hf_dataset(self.train_dataset, max_samples=50000)
-        val_ds = build_hf_dataset(self.val_dataset, max_samples=10000)
+        train_ds = build_hf_dataset(self.train_dataset, self.tokenizer, max_samples=50000)
+        val_ds = build_hf_dataset(self.val_dataset, self.tokenizer, max_samples=10000)
         print(f"Train: {len(train_ds)} samples, Val: {len(val_ds)} samples")
 
         supported_sft_fields = set(inspect.signature(SFTConfig.__init__).parameters.keys())
@@ -320,7 +363,7 @@ class LLMFinetune:
         # 构建生成式评测 Callback
         with open(DATA_CONFIG['semantic_ids_path'], 'r', encoding='utf-8') as f:
             sid_map = json.load(f)
-        sid_set = set(sid_map.values())
+        sid_set = {_to_angle_bracket_sid(sid) for sid in sid_map.values()}
         trie = TokenTrie()
         for sid in sid_set:
             trie.add(self.tokenizer.encode(sid, add_special_tokens=False))
@@ -364,7 +407,7 @@ class LLMFinetune:
             self.model = AutoModelForCausalLM.from_pretrained(model_path)
             
         # 评估
-        test_ds = build_hf_dataset(self.test_dataset)
+        test_ds = build_hf_dataset(self.test_dataset, self.tokenizer)
         
         print("\n=== Evaluating on Test Set ===")
         results = trainer.evaluate(eval_dataset=test_ds)
@@ -372,7 +415,7 @@ class LLMFinetune:
 
         with open(DATA_CONFIG['semantic_ids_path'], 'r', encoding='utf-8') as file:
             sid_map = json.load(file)
-        semantic_sid_set = set(sid_map.values())
+        semantic_sid_set = {_to_angle_bracket_sid(sid) for sid in sid_map.values()}
 
         trie = TokenTrie()
         for sid in semantic_sid_set:
@@ -401,9 +444,9 @@ class LLMFinetune:
             prompt_messages = messages[:-1]
             ground_truth = messages[-1]['content'].strip()
 
-            prompt = self.tokenizer.apply_chat_template(
+            prompt = _apply_chat_template_no_think(
+                self.tokenizer,
                 prompt_messages,
-                tokenize=False,
                 add_generation_prompt=True,
             )
             inputs = self.tokenizer(prompt, return_tensors='pt').to(self.model.device)
@@ -481,10 +524,10 @@ class LLMFinetune:
         ground_truth = messages[-1]['content']
         
         # 格式化 prompt
-        prompt = self.tokenizer.apply_chat_template(
+        prompt = _apply_chat_template_no_think(
+            self.tokenizer,
             prompt_messages,
-            tokenize=False,
-            add_generation_prompt=True
+            add_generation_prompt=True,
         )
         
         # Tokenize

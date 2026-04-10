@@ -7,6 +7,7 @@ LLM 微调数据集
 import json
 import os
 import random
+import re
 from datetime import datetime
 from typing import Dict, List, Any
 import pandas as pd
@@ -23,6 +24,42 @@ def _write_json_atomic(path: Path, data: Any) -> None:
     with open(temp_path, 'w') as f:
         json.dump(data, f)
     os.replace(temp_path, path)
+
+
+def _is_angle_bracket_sid(sid: str) -> bool:
+    return bool(re.fullmatch(r'(<[a-d]_\d+>){3,4}', sid.strip()))
+
+
+def _parse_sid_hyphen_grid(sid: str) -> tuple[List[int], str | None]:
+    match = re.fullmatch(r'(\d+)-(\d+)-(\d+)(?:\[([^\]]+)\])?', sid.strip())
+    if not match:
+        raise ValueError(f'Unsupported SID format: {sid}')
+    levels = [int(match.group(1)), int(match.group(2)), int(match.group(3))]
+    return levels, match.group(4)
+
+
+def _extract_d_index(disambig: str | None) -> int | None:
+    if disambig is None:
+        return None
+    trailing_index = re.search(r'_(\d+)$', disambig)
+    if trailing_index:
+        return int(trailing_index.group(1))
+    pure_number = re.fullmatch(r'\d+', disambig)
+    if pure_number:
+        return int(disambig)
+    return 0
+
+
+def _to_angle_bracket_sid(sid: str) -> str:
+    sid = sid.strip()
+    if _is_angle_bracket_sid(sid):
+        return sid
+    values, disambig = _parse_sid_hyphen_grid(sid)
+    base_sid = ''.join(f'<{label}_{value}>' for label, value in zip(['a', 'b', 'c'], values))
+    d_index = _extract_d_index(disambig)
+    if d_index is None:
+        return base_sid
+    return f'{base_sid}<d_{d_index}>'
 
 
 class LLMFinetuneDataset:
@@ -70,6 +107,13 @@ class LLMFinetuneDataset:
         print(f"Loading {split} samples from cache: {path}")
         with open(path, 'r') as f:
             return json.load(f)
+
+    def _ensure_datetime(self, value: Any) -> datetime:
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            return datetime.fromisoformat(value)
+        raise ValueError(f'Unsupported datetime value: {value}')
 
     def _get_time_description(self, dt: datetime) -> str:
         """获取时间描述"""
@@ -119,53 +163,46 @@ class LLMFinetuneDataset:
         return ', '.join([cat for cat, _ in top_cats]) if top_cats else 'N/A'
         
     def format_prompt(self, sample: Dict[str, Any]) -> str:
-        """格式化为 Llama 3 指令格式"""
-        user_info = sample['user_info']
+        """主路径：SID+时间历史格式"""
+        if {'instruction', 'input', 'output'}.issubset(sample.keys()):
+            return sample['input']
+
         history = sample['history']
         target = sample['target']
-        
-        # 转换 date 字符串回 datetime (如果从 JSON 加载)
-        if isinstance(target['date'], str):
-            target['date'] = datetime.fromisoformat(target['date'])
-        for item in history:
-            if isinstance(item['date'], str):
-                item['date'] = datetime.fromisoformat(item['date'])
-        
-        # 构建用户画像部分
-        user_prompt = PROMPT_TEMPLATE['user_template'].format(
-            user_id=sample['user_id'][:8],  # 截断 ID
-            review_count=user_info['review_count'],
-            average_stars=user_info['average_stars'],
-            favorite_categories=self._get_favorite_categories(history)
+        target_date = self._ensure_datetime(target['date'])
+        sid_template = PROMPT_TEMPLATE['sid_time_history']
+
+        history_items = []
+        for visit in history:
+            visit_date = self._ensure_datetime(visit['date'])
+            history_items.append(
+                sid_template['history_item'].format(
+                    time=visit_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    sid=visit['sid'],
+                )
+            )
+
+        history_text = ', '.join(history_items)
+        user_id = sample['user_id']
+        return (
+            f"{sid_template['history_prefix'].format(user_id=user_id)}{history_text}.\n"
+            f"{sid_template['query_suffix'].format(target_time=target_date.strftime('%Y-%m-%d %H:%M:%S'), user_id=user_id)}"
         )
-        
-        # 构建时空上下文
-        context_prompt = PROMPT_TEMPLATE['context_template'].format(
-            pluscode=self._get_pluscode(target['latitude'], target['longitude']),
-            time_description=self._get_time_description(target['date']),
-            day_type=self._get_day_type(target['date'])
-        )
-        
-        # 构建历史访问
-        history_prompt = PROMPT_TEMPLATE['history_template'].format(
-            count=len(history),
-            history_items=self._format_history_items(history)
-        )
-        
-        # 组合完整 prompt
-        full_prompt = (
-            f"{user_prompt}\n"
-            f"{context_prompt}\n"
-            f"{history_prompt}\n\n"
-            f"{PROMPT_TEMPLATE['instruction']}"
-        )
-        
-        return full_prompt
         
     def format_instruction(self, sample: Dict[str, Any]) -> Dict[str, str]:
         """格式化为 Llama 3.1 Chat 格式"""
+        if {'instruction', 'input', 'output'}.issubset(sample.keys()):
+            target_sid = _to_angle_bracket_sid(sample['output'])
+            return {
+                'messages': [
+                    {'role': 'system', 'content': PROMPT_TEMPLATE['system']},
+                    {'role': 'user', 'content': sample['input']},
+                    {'role': 'assistant', 'content': target_sid}
+                ]
+            }
+
         prompt = self.format_prompt(sample)
-        target_sid = sample['target_sid']
+        target_sid = _to_angle_bracket_sid(sample['target_sid'])
         
         return {
             'messages': [
@@ -192,6 +229,10 @@ class DatasetBuilder:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
     def build_and_save(self):
+        gnpr_paths = DATA_CONFIG.get('gnpr_data_paths', {})
+        if gnpr_paths and all(gnpr_paths.get(split) for split in ['train', 'val', 'test']):
+            return self._build_from_gnpr_json(gnpr_paths)
+
         print("Starting dataset construction...")
         
         # Load raw data
@@ -233,6 +274,8 @@ class DatasetBuilder:
                 business_id = row['business_id']
                 if business_id not in businesses_dict:
                     continue
+                if business_id not in semantic_ids:
+                    continue
                 
                 business_info = businesses_dict[business_id]
                 visits.append({
@@ -243,6 +286,7 @@ class DatasetBuilder:
                     'date': row['date'].isoformat(),  # Serialize for JSON
                     'latitude': business_info['latitude'],
                     'longitude': business_info['longitude'],
+                    'sid': _to_angle_bracket_sid(semantic_ids[business_id]),
                 })
 
             if len(visits) < 2:
@@ -271,7 +315,7 @@ class DatasetBuilder:
                     'user_info': user_info_dict,
                     'history': history,
                     'target': target,
-                    'target_sid': semantic_ids[target_business_id]
+                    'target_sid': _to_angle_bracket_sid(semantic_ids[target_business_id])
                 }
                 samples.append(sample)
         
@@ -299,6 +343,28 @@ class DatasetBuilder:
         print("Dataset preparation complete.")
         return splits
 
+    def _build_from_gnpr_json(self, gnpr_paths: Dict[str, str]) -> Dict[str, List[Dict[str, Any]]]:
+        print('Loading GNPR instruction datasets...')
+        splits = {}
+        for split_name in ['train', 'val', 'test']:
+            with open(gnpr_paths[split_name], 'r', encoding='utf-8') as f:
+                loaded_samples = json.load(f)
+
+            normalized = []
+            for sample in loaded_samples:
+                if not {'instruction', 'input', 'output'}.issubset(sample.keys()):
+                    continue
+                sample['output'] = _to_angle_bracket_sid(sample['output'])
+                normalized.append(sample)
+
+            path = self.cache_dir / f"{split_name}_samples.json"
+            print(f"Saving {split_name} cache to {path} ({len(normalized)} samples)...")
+            _write_json_atomic(path, normalized)
+            splits[split_name] = normalized
+
+        print('GNPR dataset preparation complete.')
+        return splits
+
 
 def prepare_datasets():
     """准备训练/验证/测试数据集"""
@@ -306,10 +372,22 @@ def prepare_datasets():
     required_splits = ['train', 'val', 'test']
     
     # Check if cache exists
+    schema = DATA_CONFIG.get('cache_schema', 'default')
+    schema_path = Path(cache_dir) / 'schema.txt' if cache_dir else None
+
     cache_exists = cache_dir and all(
         (Path(cache_dir) / f"{split}_samples.json").exists() 
         for split in required_splits
     )
+    schema_matched = schema_path and schema_path.exists() and schema_path.read_text(encoding='utf-8').strip() == schema
+
+    if cache_exists and not schema_matched:
+        print('Cache schema changed. Clearing old caches (strategy A)...')
+        for split in required_splits:
+            path = Path(cache_dir) / f"{split}_samples.json"
+            if path.exists():
+                path.unlink()
+        cache_exists = False
     
     if cache_exists:
         print(f"Found cached datasets in {cache_dir}. Loading...")
@@ -334,6 +412,9 @@ def prepare_datasets():
             train_dataset = LLMFinetuneDataset(samples=splits['train'], split='train')
             val_dataset = LLMFinetuneDataset(samples=splits['val'], split='val')
             test_dataset = LLMFinetuneDataset(samples=splits['test'], split='test')
+
+            if schema_path:
+                schema_path.write_text(schema, encoding='utf-8')
     else:
         print("Cache not found or incomplete. Building dataset from scratch...")
         builder = DatasetBuilder(
@@ -346,6 +427,9 @@ def prepare_datasets():
         train_dataset = LLMFinetuneDataset(samples=splits['train'], split='train')
         val_dataset = LLMFinetuneDataset(samples=splits['val'], split='val')
         test_dataset = LLMFinetuneDataset(samples=splits['test'], split='test')
+
+        if schema_path:
+            schema_path.write_text(schema, encoding='utf-8')
     
     print(f"Train samples: {len(train_dataset)}")
     print(f"Val samples: {len(val_dataset)}")

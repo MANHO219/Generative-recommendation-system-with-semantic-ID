@@ -1,5 +1,7 @@
 import argparse
 import json
+import re
+import inspect
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +17,31 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from llm_finetune.config import PROMPT_TEMPLATE
 
 
+def is_angle_bracket_sid(sid: str) -> bool:
+    return bool(re.fullmatch(r'(<[a-d]_\d+>){3,4}', sid.strip()))
+
+
+def to_angle_bracket_sid(sid: str) -> str:
+    sid = sid.strip()
+    if is_angle_bracket_sid(sid):
+        return sid
+    match = re.fullmatch(r'(\d+)-(\d+)-(\d+)(?:\[([^\]]+)\])?', sid)
+    if not match:
+        raise ValueError(f'Unsupported SID format: {sid}')
+    values = [int(match.group(1)), int(match.group(2)), int(match.group(3))]
+    base_sid = ''.join(f'<{label}_{value}>' for label, value in zip(['a', 'b', 'c'], values))
+    disambig = match.group(4)
+    if disambig is None:
+        return base_sid
+    trailing_index = re.search(r'_(\d+)$', disambig)
+    if trailing_index:
+        return f'{base_sid}<d_{int(trailing_index.group(1))}>'
+    pure_number = re.fullmatch(r'\d+', disambig)
+    if pure_number:
+        return f'{base_sid}<d_{int(disambig)}>'
+    return f'{base_sid}<d_0>'
+
+
 def build_trie(tokenizer, semantic_ids: List[str]) -> TokenTrie:
     trie = TokenTrie()
     for sid in semantic_ids:
@@ -26,89 +53,61 @@ def build_trie(tokenizer, semantic_ids: List[str]) -> TokenTrie:
 def load_semantic_ids(path: str) -> List[str]:
     with open(path, "r") as f:
         data = json.load(f)
-    return list({sid for sid in data.values()})
-
-
-def get_time_description(dt: datetime) -> str:
-    hour = dt.hour
-    if 6 <= hour < 12:
-        return f"{dt.strftime('%A')}, Morning ({hour}:00)"
-    if 12 <= hour < 18:
-        return f"{dt.strftime('%A')}, Afternoon ({hour}:00)"
-    if 18 <= hour < 22:
-        return f"{dt.strftime('%A')}, Evening ({hour}:00)"
-    return f"{dt.strftime('%A')}, Night ({hour}:00)"
-
-
-def get_day_type(dt: datetime) -> str:
-    return "Weekend" if dt.weekday() >= 5 else "Weekday"
-
-
-def get_pluscode(lat: float, lon: float) -> str:
-    lat_code = f"{int(lat * 100) % 100:02d}"
-    lon_code = f"{int(abs(lon) * 100) % 100:02d}"
-    return f"{lat_code}{lon_code}+XX"
-
-
-def format_history_items(history: List[Dict[str, Any]]) -> str:
-    items = []
-    for idx, visit in enumerate(history, 1):
-        item = (
-            f"{idx}. {visit['business_name']} "
-            f"({visit['categories'][:50]}) - "
-            f"Rated {visit['stars']:.1f} stars - "
-            f"{visit['date'].strftime('%Y-%m-%d')}"
-        )
-        items.append(item)
-    return "\n".join(items)
-
-
-def get_favorite_categories(history: List[Dict[str, Any]], top_k: int = 3) -> str:
-    category_counts: Dict[str, int] = {}
-    for visit in history:
-        cats = visit.get("categories", "").split(", ") if visit.get("categories") else []
-        for cat in cats:
-            category_counts[cat] = category_counts.get(cat, 0) + 1
-
-    top_cats = sorted(category_counts.items(), key=lambda x: x[1], reverse=True)[:top_k]
-    return ", ".join([cat for cat, _ in top_cats]) if top_cats else "N/A"
+    return list({to_angle_bracket_sid(sid) for sid in data.values()})
 
 
 def format_prompt(sample: Dict[str, Any]) -> str:
-    user_info = sample["user_info"]
-    history = sample["history"]
-    target = sample["target"]
+    if {'instruction', 'input', 'output'}.issubset(sample.keys()):
+        return sample['input']
 
-    if isinstance(target["date"], str):
-        target["date"] = datetime.fromisoformat(target["date"])
-    for item in history:
-        if isinstance(item["date"], str):
-            item["date"] = datetime.fromisoformat(item["date"])
+    sid_template = PROMPT_TEMPLATE['sid_time_history']
+    user_id = sample.get('user_id', 'unknown_user')
+    target = sample.get('target', {})
+    target_time = target.get('date', sample.get('target_time'))
+    if isinstance(target_time, str):
+        target_time = datetime.fromisoformat(target_time)
+    elif not isinstance(target_time, datetime):
+        raise ValueError('sample.target.date or sample.target_time is required')
 
-    user_prompt = PROMPT_TEMPLATE["user_template"].format(
-        user_id=sample["user_id"][:8],
-        review_count=user_info["review_count"],
-        average_stars=user_info["average_stars"],
-        favorite_categories=get_favorite_categories(history),
-    )
+    formatted_items = []
+    for visit in sample.get('history', []):
+        visit_time = visit.get('date') or visit.get('time')
+        sid = visit.get('sid')
+        if sid is None and 'business_id' in visit and 'business_sid_map' in sample:
+            sid = sample['business_sid_map'].get(visit['business_id'])
+        if sid is None:
+            continue
+        sid = to_angle_bracket_sid(sid)
+        if isinstance(visit_time, str):
+            visit_time = datetime.fromisoformat(visit_time)
+        if not isinstance(visit_time, datetime):
+            continue
+        formatted_items.append(
+            sid_template['history_item'].format(
+                time=visit_time.strftime('%Y-%m-%d %H:%M:%S'),
+                sid=sid,
+            )
+        )
 
-    context_prompt = PROMPT_TEMPLATE["context_template"].format(
-        pluscode=get_pluscode(target["latitude"], target["longitude"]),
-        time_description=get_time_description(target["date"]),
-        day_type=get_day_type(target["date"]),
-    )
-
-    history_prompt = PROMPT_TEMPLATE["history_template"].format(
-        count=len(history),
-        history_items=format_history_items(history),
-    )
-
+    history_text = ', '.join(formatted_items)
     return (
-        f"{user_prompt}\n"
-        f"{context_prompt}\n"
-        f"{history_prompt}\n\n"
-        f"{PROMPT_TEMPLATE['instruction']}"
+        f"{sid_template['history_prefix'].format(user_id=user_id)}{history_text}.\n"
+        f"{sid_template['query_suffix'].format(target_time=target_time.strftime('%Y-%m-%d %H:%M:%S'), user_id=user_id)}"
     )
+
+
+def apply_chat_template_no_think(tokenizer, messages, add_generation_prompt: bool) -> str:
+    kwargs = {
+        'tokenize': False,
+        'add_generation_prompt': add_generation_prompt,
+    }
+    signature = inspect.signature(tokenizer.apply_chat_template)
+    if 'enable_thinking' in signature.parameters:
+        kwargs['enable_thinking'] = False
+    rendered = tokenizer.apply_chat_template(messages, **kwargs)
+    rendered = re.sub(r'<think>[\s\S]*?</think>\s*', '', rendered)
+    rendered = rendered.replace('<think>', '').replace('</think>', '')
+    return rendered
 
 
 def build_chat_prompt(tokenizer, sample: Dict[str, Any]) -> str:
@@ -118,9 +117,9 @@ def build_chat_prompt(tokenizer, sample: Dict[str, Any]) -> str:
             {"role": "system", "content": PROMPT_TEMPLATE["system"]},
             {"role": "user", "content": user_prompt},
         ]
-        return tokenizer.apply_chat_template(
+        return apply_chat_template_no_think(
+            tokenizer,
             messages,
-            tokenize=False,
             add_generation_prompt=True,
         )
     return user_prompt
@@ -149,32 +148,12 @@ def main():
     else:
         sample = {
             "user_id": "demo_user_123456",
-            "user_info": {"review_count": 120, "average_stars": 4.1},
             "history": [
-                {
-                    "business_name": "Starbucks",
-                    "categories": "Coffee & Tea, Cafes",
-                    "stars": 4.0,
-                    "date": "2024-11-01",
-                },
-                {
-                    "business_name": "Burger King",
-                    "categories": "Fast Food, Burgers",
-                    "stars": 3.5,
-                    "date": "2024-11-03",
-                },
-                {
-                    "business_name": "McDonald's",
-                    "categories": "Fast Food, Burgers",
-                    "stars": 3.0,
-                    "date": "2024-11-05",
-                },
+                {"sid": "<a_31><b_73><c_58>", "time": "2024-11-01T10:15:00"},
+                {"sid": "<a_66><b_122><c_25>", "time": "2024-11-03T19:20:00"},
+                {"sid": "<a_74><b_51><c_62>", "time": "2024-11-05T08:02:00"},
             ],
-            "target": {
-                "latitude": 37.7749,
-                "longitude": -122.4194,
-                "date": "2024-11-06",
-            },
+            "target": {"date": "2024-11-06T12:00:00"},
         }
 
     prompt = build_chat_prompt(tokenizer, sample)

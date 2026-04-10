@@ -59,44 +59,57 @@ DATA_CONFIG = {
     'test_split': 0.1,
     'max_history_length': 10,  # 用户历史最多10条
     'cache_dir': str(_BASE_DIR / 'output/dataset_cache'),  # 缓存目录
+    'cache_schema': 'sid_time_history_angle_bracket_v1',
+    'default_prompt_mode': 'sid_time_history',
+    'enable_legacy_prompt_mode': True,
+    'sid_format_mode': 'angle_bracket',
+    'gnpr_data_paths': {
+        'train': None,
+        'val': None,
+        'test': None,
+    },
 }
 
 # Prompt 模板
 PROMPT_TEMPLATE = {
     'system': (
-        "You are an intelligent POI (Point of Interest) recommendation assistant. "
-        "Your task is to predict the next POI that a user will visit based on "
-        "their profile, visit history, and current spatiotemporal context. "
-        "Generate the Semantic ID in the format: level0-level1-level2[GRID] "
-        "(e.g., 12-34-56[GQ])."
+        "You are a POI next-visit prediction assistant. "
+        "Predict only the next POI Semantic ID based on historical visit SIDs and timestamps. "
+        "Output only one Semantic ID in angle-bracket format, such as "
+        "<a_12><b_34><c_56> or <a_12><b_34><c_56><d_1>."
     ),
-    
-    'user_template': (
-        "### User Profile:\n"
-        "- User ID: {user_id}\n"
-        "- Active Level: {review_count} reviews\n"
-        "- Average Rating: {average_stars:.1f} stars\n"
-        "- Favorite Categories: {favorite_categories}\n"
-    ),
-    
-    'context_template': (
-        "### Spatiotemporal Context:\n"
-        "- Current Location: Plus Code {pluscode}\n"
-        "- Time: {time_description}\n"
-        "- Day Type: {day_type}\n"
-    ),
-    
-    'history_template': (
-        "### Visit History (Recent {count} visits):\n"
-        "{history_items}"
-    ),
-    
-    'instruction': (
-        "Based on the above information, predict the Semantic ID of the next POI "
-        "the user will visit. Consider:\n"
-        "1. User's historical preferences\n"
-        "2. Spatiotemporal patterns (location, time, day)\n"
-        "3. POI availability (must be open at the predicted time)\n\n"
-        "Output only the Semantic ID in format: XX-XX-XX[GG]"
-    )
+
+    'sid_time_history': {
+        'instruction': (
+            "Here is a record of a user's POI accesses, your task is based on the history "
+            "to predict the POI that the user is likely to access at the specified time."
+        ),
+        'history_prefix': 'User_{user_id} checkin history: ',
+        'history_item': '{time} visited {sid}',
+        'query_suffix': 'When {target_time} user_{user_id} is likely to visit:',
+    },
+
+    'legacy_profile_context': {
+        'user_template': (
+            "### User Profile:\n"
+            "- User ID: {user_id}\n"
+            "- Active Level: {review_count} reviews\n"
+            "- Average Rating: {average_stars:.1f} stars\n"
+            "- Favorite Categories: {favorite_categories}\n"
+        ),
+        'context_template': (
+            "### Spatiotemporal Context:\n"
+            "- Current Location: Plus Code {pluscode}\n"
+            "- Time: {time_description}\n"
+            "- Day Type: {day_type}\n"
+        ),
+        'history_template': (
+            "### Visit History (Recent {count} visits):\n"
+            "{history_items}"
+        ),
+        'instruction': (
+            "Based on the above information, predict the Semantic ID of the next POI "
+            "the user will visit. Output only one Semantic ID in angle-bracket format."
+        ),
+    },
 }

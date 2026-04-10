@@ -29,7 +29,7 @@ rm -rf /mnt/data/liuwei/yewenhao/main/output/dataset_cache/
 ## 模块概述
 
 基于 QLoRA 的 Qwen3-8B-Instruct 指令微调，用于 POI Semantic ID 序列预测。
-模型接收用户历史访问序列和时空上下文，生成目标 POI 的三层 Semantic ID。
+默认主路径采用 **SID+时间历史**（GNPR/V1 风格），模型接收历史 `time + SID` 序列并预测目标 SID。
 
 ---
 
@@ -48,50 +48,35 @@ llm_finetune/
 
 ## 输入输出格式
 
-### 输入（ChatML 格式，三段式）
+### 输入（ChatML 格式，三段式，默认主路径）
 
 ```
 <|im_start|>system
-You are an intelligent POI recommendation assistant. ...<|im_end|>
+You are a POI next-visit prediction assistant...<|im_end|>
 <|im_start|>user
-### User Profile:
-- User ID: abc12345
-- Active Level: 150 reviews
-- Average Rating: 4.2 stars
-- Favorite Categories: Restaurants, Coffee & Tea, Bars
-
-### Spatiotemporal Context:
-- Current Location: Plus Code 3316+XX
-- Time: Friday, Evening (19:00)
-- Day Type: Weekday
-
-### Visit History (Recent 5 visits):
-1. Starbucks (Coffee & Tea) - Rated 4.0 stars - 2024-01-15
-2. McDonald's (Fast Food) - Rated 3.5 stars - 2024-01-14
-...
-
-Based on the above information, predict the Semantic ID of the next POI ...
-Output only the Semantic ID in format: XX-XX-XX[GG]<|im_end|>
+User_abc12345 checkin history: 2024-01-15 10:00:00 visited <a_12><b_34><c_56>,
+2024-01-16 18:20:00 visited <a_22><b_18><c_9>.
+When 2024-01-17 12:00:00 user_abc12345 is likely to visit:<|im_end|>
 <|im_start|>assistant
 ```
 
 ### 输出
 
 ```
-12-34-56[GQ]
+<a_12><b_34><c_56>
 ```
 
-三层 RQ-VAE Semantic ID，基础格式为 `XX-XX-XX`；
-若该 SID 存在冲突，追加后缀为 `XX-XX-XX[GG]` 或 `XX-XX-XX[GG_n]`。
+默认 SID 格式为 `angle_bracket`，即 `<a_x><b_y><c_z>`（可选 `<d_n>`）。
+存在冲突消歧后缀时，输出可为 `<a_x><b_y><c_z><d_n>`，例如 `<a_12><b_34><c_56><d_2>`。
 
 ---
 
 ## 数据流
 
 ```
-Yelp 原始数据（business_poi / user_active / review_poi）
+Yelp 原始数据（business_poi / user_active / review_poi）或 GNPR JSON（instruction/input/output）
     ↓ DatasetBuilder.build_and_save()
-滑窗样本（history + target + target_sid）
+标准化样本（history + target + target_sid）
     ↓ random.seed(42) shuffle → 80/10/10 切分
 output/dataset_cache/{train,val,test}_samples.json   ← 缓存文件
     ↓ LLMFinetuneDataset.__getitem__() → format_instruction()
@@ -100,8 +85,8 @@ ChatML 格式样本
 SFTTrainer
 ```
 
-**注意**：`target_sid` 在构建时从 `output/semantic_ids.json` 写入缓存。
-更换 Semantic ID 后必须删除缓存，否则训练标签与推理 Trie 不一致。
+**注意**：`target_sid` 在构建时从 `semantic_ids_path` 写入缓存，并统一为 `angle_bracket`。
+采用缓存策略 A：模板/schema/SID 字典变化时直接删除缓存并重建。
 
 ---
 
@@ -161,9 +146,10 @@ SFTTrainer
 ## 数据缓存说明
 
 - 缓存路径：`output/dataset_cache/{train,val,test}_samples.json`
+- Schema 标记：`output/dataset_cache/schema.txt`
 - 首次运行或缓存不存在时自动构建（耗时较长）
 - 缓存文件损坏时自动删除并重建
-- **更换 `semantic_ids.json` 后必须手动删除缓存**，否则 `target_sid` 标签错误
+- **当 Prompt 模板 / `sid_format_mode` / `semantic_ids_path` 变化时，必须删除缓存并重建**
 
 ---
 
