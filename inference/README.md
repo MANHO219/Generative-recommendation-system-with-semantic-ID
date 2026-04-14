@@ -87,6 +87,11 @@ python /mnt/data/liuwei/yewenhao/main/inference/hr_eval.py \
   --pred_file /mnt/data/liuwei/yewenhao/main/output/llamafactory/gnpr_qwen3_4b_lora_predict/generated_predictions.jsonl \
   --top_k 5 \
   --save_path /mnt/data/liuwei/yewenhao/main/output/llamafactory/gnpr_qwen3_4b_lora_predict/hr_metrics_k5.json
+
+python /mnt/data/liuwei/yewenhao/main/inference/hr_eval.py \
+  --pred_file /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_10k2k_predict/generated_predictions.jsonl \
+  --top_k 5 \
+  --save_path /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_10k2k_predict/hr_metrics_k5.json
 ```
 
 输出指标包括：
@@ -95,6 +100,35 @@ python /mnt/data/liuwei/yewenhao/main/inference/hr_eval.py \
 - `mrr@k`
 - `ndcg@k`
 - `single_prediction_ratio`
+
+## Prompt 长度统计与分桶评估
+
+### 1）统计 Prompt 历史长度分布
+
+使用 `prompt_history_stats.py` 统计 `input/prompt` 中历史访问条数分布（含分位数、频次和分桶占比）：
+
+```bash
+python /mnt/data/liuwei/yewenhao/main/inference/prompt_history_stats.py \
+  --prompt_file /mnt/data/liuwei/yewenhao/main/output/dataset_cache/test_prompts_2k.json \
+  --prompt_field input \
+  --save_path /mnt/data/liuwei/yewenhao/main/output/dataset_cache/test_prompts_2k_hist_stats.json
+```
+
+### 2）按历史长度分桶评估命中率
+
+使用 `bucket_hit_eval.py` 对预测结果按历史长度分桶统计 `HR@1/HR@K/MRR@K`：
+
+```bash
+python /mnt/data/liuwei/yewenhao/main/inference/bucket_hit_eval.py \
+  --pred_file /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_10k2k_predict/generated_predictions.jsonl \
+  --top_k 5 \
+  --prompt_field prompt \
+  --save_path /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_10k2k_predict/bucket_hit_eval.json
+```
+
+说明：
+- `--prompt_field` 默认是 `prompt`，如果你的预测文件字段是 `input`，可改为 `--prompt_field input`。
+- 分桶规则可通过 `--bins` 指定，如：`1-5,6-10,11-20,21-30,31-40,41-50`。
 
 ## 注意事项
 
