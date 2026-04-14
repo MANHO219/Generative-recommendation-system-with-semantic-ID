@@ -19,10 +19,10 @@ except ImportError:
     from config import DATA_CONFIG, PROMPT_TEMPLATE
 
 
-def _write_json_atomic(path: Path, data: Any) -> None:
+def _write_json_atomic(path: Path, data: Any, *, ensure_ascii: bool = False, indent: int | None = None) -> None:
     temp_path = path.with_suffix(path.suffix + '.tmp')
     with open(temp_path, 'w') as f:
-        json.dump(data, f)
+        json.dump(data, f, ensure_ascii=ensure_ascii, indent=indent)
     os.replace(temp_path, path)
 
 
@@ -434,6 +434,33 @@ def prepare_datasets():
     print(f"Train samples: {len(train_dataset)}")
     print(f"Val samples: {len(val_dataset)}")
     print(f"Test samples: {len(test_dataset)}")
+
+    if DATA_CONFIG.get('export_prompts_on_prepare', False):
+        export_dir = Path(DATA_CONFIG.get('prompt_export_dir', cache_dir or 'output/dataset_cache'))
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        sid_template = PROMPT_TEMPLATE['sid_time_history']
+        instruction_text = sid_template.get('instruction', '')
+
+        def _to_prompt_record(dataset: LLMFinetuneDataset, sample: Dict[str, Any]) -> Dict[str, str]:
+            if {'instruction', 'input', 'output'}.issubset(sample.keys()):
+                return {
+                    'instruction': sample['instruction'],
+                    'input': sample['input'],
+                    'output': _to_angle_bracket_sid(sample['output']),
+                }
+
+            return {
+                'instruction': instruction_text,
+                'input': dataset.format_prompt(sample),
+                'output': _to_angle_bracket_sid(sample['target_sid']),
+            }
+
+        for split_name, dataset in [('train', train_dataset), ('val', val_dataset), ('test', test_dataset)]:
+            prompts = [_to_prompt_record(dataset, sample) for sample in dataset.samples]
+            prompt_path = export_dir / f'{split_name}_prompts.json'
+            _write_json_atomic(prompt_path, prompts, ensure_ascii=False, indent=2)
+            print(f'已保存 {split_name}: {len(prompts)} 条到 {prompt_path}')
     
     return train_dataset, val_dataset, test_dataset
 

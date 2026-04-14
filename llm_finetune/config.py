@@ -57,9 +57,11 @@ DATA_CONFIG = {
     'train_split': 0.8,
     'val_split': 0.1,
     'test_split': 0.1,
-    'max_history_length': 10,  # 用户历史最多10条
+    'max_history_length': 50,  # 用户历史最多50条
     'cache_dir': str(_BASE_DIR / 'output/dataset_cache'),  # 缓存目录
-    'cache_schema': 'sid_time_history_angle_bracket_v1',
+    'cache_schema': 'sid_time_history_angle_bracket_gnpr',
+    'export_prompts_on_prepare': True,
+    'prompt_export_dir': str(_BASE_DIR / 'output/dataset_cache'),
     'default_prompt_mode': 'sid_time_history',
     'enable_legacy_prompt_mode': True,
     'sid_format_mode': 'angle_bracket',

@@ -66,6 +66,22 @@ def _to_angle_bracket_sid(sid: str) -> str:
     return f'{base_sid}<d_0>'
 
 
+def _normalize_sid_text(value: str) -> str:
+    text = value.strip()
+    if not text:
+        return text
+
+    angle_match = re.search(r'(<[a-d]_\d+>){3,4}', text)
+    if angle_match:
+        return angle_match.group(0)
+
+    dash_match = re.search(r'(\d+-\d+-\d+(?:\[[^\]]+\])?)', text)
+    if dash_match:
+        return _to_angle_bracket_sid(dash_match.group(1))
+
+    return _to_angle_bracket_sid(text)
+
+
 def _apply_chat_template_no_think(tokenizer, messages, add_generation_prompt: bool) -> str:
     kwargs = {
         'tokenize': False,
@@ -105,7 +121,7 @@ class GenerativeEvalCallback(TrainerCallback):
         for idx in range(self.num_samples):
             sample = self.test_dataset[idx]
             messages = sample['messages']
-            ground_truth = messages[-1]['content'].strip()
+            ground_truth = _normalize_sid_text(messages[-1]['content'])
 
             prompt = _apply_chat_template_no_think(
                 self.tokenizer,
@@ -138,9 +154,10 @@ class GenerativeEvalCallback(TrainerCallback):
             for beam_idx in range(outputs.shape[0]):
                 pred = self.tokenizer.decode(
                     outputs[beam_idx][prefix_len:], skip_special_tokens=True).strip()
-                if pred not in seen:
-                    seen.add(pred)
-                    candidates.append(pred)
+                normalized_pred = _normalize_sid_text(pred)
+                if normalized_pred not in seen:
+                    seen.add(normalized_pred)
+                    candidates.append(normalized_pred)
 
             top1 = candidates[0] if candidates else ''
             top_k_cands = candidates[:self.top_k]
@@ -311,8 +328,8 @@ class LLMFinetune:
     def train(self):
         """开始训练"""
         print("Preparing HuggingFace datasets...")
-        train_ds = build_hf_dataset(self.train_dataset, self.tokenizer, max_samples=50000)
-        val_ds = build_hf_dataset(self.val_dataset, self.tokenizer, max_samples=10000)
+        train_ds = build_hf_dataset(self.train_dataset, self.tokenizer, max_samples=10000)
+        val_ds = build_hf_dataset(self.val_dataset, self.tokenizer, max_samples=2000)
         print(f"Train: {len(train_ds)} samples, Val: {len(val_ds)} samples")
 
         supported_sft_fields = set(inspect.signature(SFTConfig.__init__).parameters.keys())
@@ -442,7 +459,7 @@ class LLMFinetune:
             sample = self.test_dataset[index]
             messages = sample['messages']
             prompt_messages = messages[:-1]
-            ground_truth = messages[-1]['content'].strip()
+            ground_truth = _normalize_sid_text(messages[-1]['content'])
 
             prompt = _apply_chat_template_no_think(
                 self.tokenizer,
@@ -478,9 +495,10 @@ class LLMFinetune:
                     outputs[beam_index][prefix_len:],
                     skip_special_tokens=True,
                 ).strip()
-                if predicted not in seen:
-                    seen.add(predicted)
-                    candidates.append(predicted)
+                normalized_pred = _normalize_sid_text(predicted)
+                if normalized_pred not in seen:
+                    seen.add(normalized_pred)
+                    candidates.append(normalized_pred)
 
             top_1 = candidates[0] if candidates else ''
             top_k_candidates = candidates[:top_k]
