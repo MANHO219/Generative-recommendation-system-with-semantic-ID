@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 
 ANGLE_SID_PATTERN = re.compile(r"(?:<[a-d]_\d+>){3,4}")
-DASH_SID_PATTERN = re.compile(r"\d+-\d+-\d+(?:\[[^\]]+\])?")
+DASH_SID_PATTERN = re.compile(r"\d+-\d+-\d+(?:(?:<d_\d+>)|\[[^\]]+\])?")
 
 
 def is_angle_bracket_sid(value: str) -> bool:
@@ -19,13 +19,17 @@ def to_angle_bracket_sid(value: str) -> str:
     if is_angle_bracket_sid(sid):
         return sid
 
-    match = re.fullmatch(r"(\d+)-(\d+)-(\d+)(?:\[([^\]]+)\])?", sid)
+    match = re.fullmatch(r"(\d+)-(\d+)-(\d+)(?:(?:<d_(\d+)>)|\[([^\]]+)\])?", sid)
     if not match:
         raise ValueError(f"Unsupported SID format: {value}")
 
     values = [int(match.group(1)), int(match.group(2)), int(match.group(3))]
     base_sid = "".join(f"<{label}_{item}>" for label, item in zip(["a", "b", "c"], values))
-    disambig = match.group(4)
+    d_suffix = match.group(4)
+    if d_suffix is not None:
+        return f"{base_sid}<d_{int(d_suffix)}>"
+
+    disambig = match.group(5)
     if disambig is None:
         return base_sid
 
@@ -44,6 +48,10 @@ def normalize_sid(candidate: str) -> Optional[str]:
     text = candidate.strip()
     if not text:
         return None
+
+    token_matches = re.findall(r"<[a-d]_\d+>", text)
+    if len(token_matches) >= 3:
+        return "".join(token_matches[:4]) if len(token_matches) >= 4 else "".join(token_matches[:3])
 
     angle_match = ANGLE_SID_PATTERN.search(text)
     if angle_match:

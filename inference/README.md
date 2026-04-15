@@ -31,6 +31,7 @@ python -m inference.run_inference --help
 - `--print_examples`（可选）
 - `--log_every`（可选）
 - `--eval_report_path`（可选）
+- `--eval_predictions_path`（可选，保存逐样本预测含 Top-K 候选）
 - `--max_new_tokens`（可选）
 - `--num_beams`（可选）
 - `--top_k`（可选）
@@ -75,8 +76,30 @@ CUDA_VISIBLE_DEVICES=2 PYTHONNOUSERSITE=1 /mnt/data/liuwei/anaconda3/envs/ywh/bi
   --temperature 0 \
   --print_examples 20 \
   --log_every 50 \
-  --eval_report_path /mnt/data/liuwei/yewenhao/main/logs/inference/eval_final.json
+  --eval_report_path /mnt/data/liuwei/yewenhao/main/logs/inference/eval_final.json \
+  --eval_predictions_path /mnt/data/liuwei/yewenhao/main/logs/inference/eval_final_topk.jsonl
 ```
+
+### 5）真 Top-K 评估（推荐）
+
+先用上面的 `--eval_predictions_path` 导出逐样本候选，然后评估该文件：
+
+```bash
+python /mnt/data/liuwei/yewenhao/main/inference/hr_eval.py \
+  --pred_file /mnt/data/liuwei/yewenhao/main/logs/inference/eval_final_topk.jsonl \
+  --top_k 5 \
+  --save_path /mnt/data/liuwei/yewenhao/main/logs/inference/eval_final_topk_hr.json
+
+python /mnt/data/liuwei/yewenhao/main/inference/bucket_hit_eval.py \
+  --pred_file /mnt/data/liuwei/yewenhao/main/logs/inference/eval_final_topk.jsonl \
+  --top_k 5 \
+  --prompt_field prompt \
+  --save_path /mnt/data/liuwei/yewenhao/main/logs/inference/eval_final_topk_bucket.json
+```
+
+说明：
+- 真 Top-K 要求预测文件中存在列表字段（如 `candidates`）。
+- `generated_predictions.jsonl` 通常只有单条 `predict`，此时 `HR@5` 退化为 `HR@1`。
 
 ## 结果评估命令（HR 指标）
 
@@ -90,7 +113,7 @@ python /mnt/data/liuwei/yewenhao/main/inference/hr_eval.py \
 
 python /mnt/data/liuwei/yewenhao/main/inference/hr_eval.py \
   --pred_file /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_10k2k_predict/generated_predictions.jsonl \
-  --top_k 5 \
+  --top_k 20 \
   --save_path /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_10k2k_predict/hr_metrics_k5.json
 ```
 

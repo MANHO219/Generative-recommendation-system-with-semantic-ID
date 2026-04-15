@@ -31,12 +31,15 @@ def to_angle_bracket_sid(sid: str) -> str:
     sid = sid.strip()
     if is_angle_bracket_sid(sid):
         return sid
-    match = re.fullmatch(r'(\d+)-(\d+)-(\d+)(?:\[([^\]]+)\])?', sid)
+    match = re.fullmatch(r'(\d+)-(\d+)-(\d+)(?:(?:<d_(\d+)>)|\[([^\]]+)\])?', sid)
     if not match:
         raise ValueError(f'Unsupported SID format: {sid}')
     values = [int(match.group(1)), int(match.group(2)), int(match.group(3))]
     base_sid = ''.join(f'<{label}_{value}>' for label, value in zip(['a', 'b', 'c'], values))
-    disambig = match.group(4)
+    d_suffix = match.group(4)
+    if d_suffix is not None:
+        return f'{base_sid}<d_{int(d_suffix)}>'
+    disambig = match.group(5)
     if disambig is None:
         return base_sid
     trailing_index = re.search(r'_(\d+)$', disambig)
@@ -152,11 +155,15 @@ def normalize_sid_text(value: str) -> str:
     if not text:
         return text
 
+    token_matches = re.findall(r'<[a-d]_\d+>', text)
+    if len(token_matches) >= 3:
+        return ''.join(token_matches[:4]) if len(token_matches) >= 4 else ''.join(token_matches[:3])
+
     angle_match = re.search(r'(<[a-d]_\d+>){3,4}', text)
     if angle_match:
         return angle_match.group(0)
 
-    dash_match = re.search(r'(\d+-\d+-\d+(?:\[[^\]]+\])?)', text)
+    dash_match = re.search(r'(\d+-\d+-\d+(?:(?:<d_\d+>)|\[[^\]]+\])?)', text)
     if dash_match:
         try:
             return to_angle_bracket_sid(dash_match.group(1))
@@ -260,6 +267,7 @@ def run_batch_eval(model, tokenizer, trie: TokenTrie, args, semantic_sid_set: se
     valid_sid = 0
     latencies = []
     top_k = max(1, args.top_k)
+    prediction_rows = []
 
     for index, sample in enumerate(samples, 1):
         start_time = time.time()
@@ -281,6 +289,21 @@ def run_batch_eval(model, tokenizer, trie: TokenTrie, args, semantic_sid_set: se
             recall_at_k += 1
             rank = topk.index(gt) + 1
             mrr_sum += 1.0 / rank
+
+        if args.eval_predictions_path:
+            prompt_text = ""
+            if isinstance(sample.get("input"), str):
+                prompt_text = sample["input"]
+            elif isinstance(sample.get("prompt"), str):
+                prompt_text = sample["prompt"]
+            prediction_rows.append(
+                {
+                    "prompt": prompt_text,
+                    "predict": top1,
+                    "label": gt,
+                    "candidates": topk,
+                }
+            )
 
         if index <= args.print_examples:
             print(f"[Example {index}] top1={top1} | gt={gt} | exact={top1 == gt} | hit@{top_k}={gt in topk}")
@@ -314,6 +337,14 @@ def run_batch_eval(model, tokenizer, trie: TokenTrie, args, semantic_sid_set: se
         report_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"saved_report: {report_path}")
 
+    if args.eval_predictions_path:
+        predictions_path = Path(args.eval_predictions_path)
+        predictions_path.parent.mkdir(parents=True, exist_ok=True)
+        with predictions_path.open("w", encoding="utf-8") as file:
+            for row in prediction_rows:
+                file.write(json.dumps(row, ensure_ascii=False) + "\n")
+        print(f"saved_predictions: {predictions_path}")
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -326,6 +357,7 @@ def main():
     parser.add_argument("--print_examples", type=int, default=3)
     parser.add_argument("--log_every", type=int, default=20)
     parser.add_argument("--eval_report_path", type=str, default=None)
+    parser.add_argument("--eval_predictions_path", type=str, default=None)
     parser.add_argument("--max_new_tokens", type=int, default=10)
     parser.add_argument("--num_beams", type=int, default=5)
     parser.add_argument("--top_k", type=int, default=5)

@@ -49,12 +49,15 @@ def _to_angle_bracket_sid(sid: str) -> str:
     sid = sid.strip()
     if _is_angle_bracket_sid(sid):
         return sid
-    match = re.fullmatch(r'(\d+)-(\d+)-(\d+)(?:\[([^\]]+)\])?', sid)
+    match = re.fullmatch(r'(\d+)-(\d+)-(\d+)(?:(?:<d_(\d+)>)|\[([^\]]+)\])?', sid)
     if not match:
         return sid
     values = [int(match.group(1)), int(match.group(2)), int(match.group(3))]
     base_sid = ''.join(f'<{label}_{value}>' for label, value in zip(['a', 'b', 'c'], values))
-    disambig = match.group(4)
+    d_suffix = match.group(4)
+    if d_suffix is not None:
+        return f'{base_sid}<d_{int(d_suffix)}>'
+    disambig = match.group(5)
     if disambig is None:
         return base_sid
     trailing_index = re.search(r'_(\d+)$', disambig)
@@ -71,11 +74,15 @@ def _normalize_sid_text(value: str) -> str:
     if not text:
         return text
 
+    token_matches = re.findall(r'<[a-d]_\d+>', text)
+    if len(token_matches) >= 3:
+        return ''.join(token_matches[:4]) if len(token_matches) >= 4 else ''.join(token_matches[:3])
+
     angle_match = re.search(r'(<[a-d]_\d+>){3,4}', text)
     if angle_match:
         return angle_match.group(0)
 
-    dash_match = re.search(r'(\d+-\d+-\d+(?:\[[^\]]+\])?)', text)
+    dash_match = re.search(r'(\d+-\d+-\d+(?:(?:<d_\d+>)|\[[^\]]+\])?)', text)
     if dash_match:
         return _to_angle_bracket_sid(dash_match.group(1))
 
@@ -328,8 +335,8 @@ class LLMFinetune:
     def train(self):
         """开始训练"""
         print("Preparing HuggingFace datasets...")
-        train_ds = build_hf_dataset(self.train_dataset, self.tokenizer, max_samples=10000)
-        val_ds = build_hf_dataset(self.val_dataset, self.tokenizer, max_samples=2000)
+        train_ds = build_hf_dataset(self.train_dataset, self.tokenizer, max_samples=25000)
+        val_ds = build_hf_dataset(self.val_dataset, self.tokenizer, max_samples=5000)
         print(f"Train: {len(train_ds)} samples, Val: {len(val_ds)} samples")
 
         supported_sft_fields = set(inspect.signature(SFTConfig.__init__).parameters.keys())
