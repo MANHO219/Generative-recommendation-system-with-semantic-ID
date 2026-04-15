@@ -102,6 +102,27 @@ def load_poi_meta(path):
 
 # ===================== 分布计算 =====================
 
+def compute_entropy(prefix_counts):
+    """基于 prefix 频次计算信息熵（以 2 为底）"""
+    import math
+    total = sum(prefix_counts.values())
+    if total == 0:
+        return 0.0
+    probs = [count / total for count in prefix_counts.values() if count > 0]
+    return -sum(p * math.log(p, 2) for p in probs)
+
+
+def compute_gini(prefix_counts):
+    """计算 prefix 分布的 Gini 系数"""
+    counts = sorted(prefix_counts.values())
+    n = len(counts)
+    if n == 0:
+        return 0.0
+    total_sum = sum(counts)
+    gini_sum = sum((2 * i + 1) * c for i, c in enumerate(counts))
+    return (2 * gini_sum / (n * total_sum)) - (n + 1) / n
+
+
 def compute_prefix_distribution(semantic_ids, poi_meta, prefix_len, p1_filter=None, p2_filter=None, region_key='city'):
     """
     返回 DataFrame，含百分比和实际 Top 名称。
@@ -403,6 +424,8 @@ def main():
                         help='只展示指定 P2 值（需配合 prefix_len>=2）')
     parser.add_argument('--region_key', choices=['city', 'postal_code', 'neighborhood'], default='city',
                         help='Region 维度使用的字段（默认 city）')
+    parser.add_argument('--compute_metrics', action='store_true',
+                        help='输出 Coverage, Collision Rate, Entropy, Gini, PlusCode Rate 五项指标')
     args = parser.parse_args()
 
     poi_path = os.path.join(args.data_dir, 'business_poi.json')
@@ -425,6 +448,38 @@ def main():
 
         n_disambig = sum(1 for s in semantic_ids.values() if '<' in s)
         print(f"  Disambig: {n_disambig} ({n_disambig/len(semantic_ids)*100:.1f}%)")
+
+        if args.compute_metrics:
+            # 计算 prefix 分布统计
+            prefix_counts = defaultdict(int)
+            pluscode_counts = 0
+            for sid in semantic_ids.values():
+                prefix = get_prefix(sid, args.prefix_len)
+                prefix_counts[prefix] += 1
+                if '<' in sid:
+                    pluscode_counts += 1
+
+            total_pois = len(semantic_ids)
+            n_prefixes = len(prefix_counts)
+            coverage = n_prefixes / total_pois * 100 if total_pois > 0 else 0
+
+            # Collision Rate: 同一 prefix 下的 POI 数量方差（归一化）
+            if n_prefixes > 0:
+                counts = list(prefix_counts.values())
+                mean_count = total_pois / n_prefixes
+                collision_rate = sum((c - mean_count) ** 2 for c in counts) / n_prefixes / (mean_count ** 2) if mean_count > 0 else 0
+            else:
+                collision_rate = 0.0
+
+            entropy = compute_entropy(prefix_counts)
+            gini = compute_gini(prefix_counts)
+            pluscode_rate = pluscode_counts / total_pois * 100 if total_pois > 0 else 0
+
+            print(f"  Coverage: {coverage:.2f}%")
+            print(f"  Collision Rate: {collision_rate:.4f}")
+            print(f"  Entropy: {entropy:.4f}")
+            print(f"  Gini: {gini:.4f}")
+            print(f"  PlusCode Rate: {pluscode_rate:.2f}%")
 
         # CLI 参数名到 POI 实际字段名的映射
         region_field_map = {'neighborhood': 'plus_code_neighborhood'}
