@@ -59,6 +59,8 @@ DATA_CONFIG = {
     'test_split': 0.1,
     'max_history_length': 50,  # 用户历史最多50条
     'min_user_interactions': 5,  # 显式用户筛选：至少保留 5 条有效访问
+    'test_mode': 'sliding',  # sliding: 滑窗测试；last_item: 每用户仅最后一次目标
+    'export_last_item_test': True,  # 在 sliding 模式下额外导出公平对比用的 last-item 测试集
     'enable_strict_kcore': False,
     'k_core': 5,
     'k_core_use_cache': True,

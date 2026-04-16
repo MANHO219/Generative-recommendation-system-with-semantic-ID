@@ -292,10 +292,16 @@ class DatasetBuilder:
         
         # Build samples
         print("Processing user histories and generating samples...")
-        samples = []
+        sliding_samples = []
+        last_item_samples = []
         max_history = DATA_CONFIG['max_history_length']
         min_user_interactions = int(DATA_CONFIG.get('min_user_interactions', 2))
         min_user_interactions = max(2, min_user_interactions)
+        test_mode = DATA_CONFIG.get('test_mode', 'sliding')
+        export_last_item_test = bool(DATA_CONFIG.get('export_last_item_test', True))
+
+        if test_mode not in {'sliding', 'last_item'}:
+            raise ValueError(f"Unsupported test_mode: {test_mode}")
         
         grouped = reviews_df.groupby('user_id')
         total_groups = len(grouped)
@@ -345,6 +351,7 @@ class DatasetBuilder:
             }
             
             # Generate sliding window samples
+            user_samples = []
             for i in range(1, len(visits)):
                 history = visits[max(0, i-max_history):i]
                 target = visits[i]
@@ -360,26 +367,60 @@ class DatasetBuilder:
                     'target': target,
                     'target_sid': _to_angle_bracket_sid(semantic_ids[target_business_id])
                 }
-                samples.append(sample)
-        
-        print(f"Generated {len(samples)} total samples. Splitting...")
+                user_samples.append(sample)
+
+            if not user_samples:
+                continue
+
+            last_item_samples.append(user_samples[-1])
+            if test_mode == 'last_item':
+                sliding_samples.extend(user_samples[:-1])
+            else:
+                sliding_samples.extend(user_samples)
+
+        print(f"Generated {len(sliding_samples)} sliding samples.")
+        print(f"Generated {len(last_item_samples)} per-user last-item samples.")
         print(
             f"Users kept after min interactions filter: {kept_user_count}/{total_groups} "
             f"(min_user_interactions={min_user_interactions})"
         )
-        
+
         # Deterministic shuffle and split
         random.seed(42)  # Ensure reproducibility
-        random.shuffle(samples)
-        
-        train_size = int(len(samples) * DATA_CONFIG['train_split'])
-        val_size = int(len(samples) * DATA_CONFIG['val_split'])
-        
-        splits = {
-            'train': samples[:train_size],
-            'val': samples[train_size:train_size+val_size],
-            'test': samples[train_size+val_size:]
-        }
+        random.shuffle(sliding_samples)
+
+        if test_mode == 'last_item':
+            train_val_ratio = float(DATA_CONFIG['train_split']) + float(DATA_CONFIG['val_split'])
+            if train_val_ratio <= 0:
+                raise ValueError('train_split + val_split must be > 0 when test_mode=last_item')
+
+            normalized_train_ratio = float(DATA_CONFIG['train_split']) / train_val_ratio
+            train_size = int(len(sliding_samples) * normalized_train_ratio)
+
+            splits = {
+                'train': sliding_samples[:train_size],
+                'val': sliding_samples[train_size:],
+                'test': last_item_samples,
+            }
+            print(
+                f"Split mode: last_item | train={len(splits['train'])} val={len(splits['val'])} "
+                f"test(last_item)={len(splits['test'])}"
+            )
+        else:
+            train_size = int(len(sliding_samples) * DATA_CONFIG['train_split'])
+            val_size = int(len(sliding_samples) * DATA_CONFIG['val_split'])
+
+            splits = {
+                'train': sliding_samples[:train_size],
+                'val': sliding_samples[train_size:train_size+val_size],
+                'test': sliding_samples[train_size+val_size:]
+            }
+            if export_last_item_test:
+                splits['test_last_item'] = last_item_samples
+            print(
+                f"Split mode: sliding | train={len(splits['train'])} val={len(splits['val'])} "
+                f"test(sliding)={len(splits['test'])}"
+            )
         
         # Save cache
         for split_name, split_samples in splits.items():
@@ -422,6 +463,7 @@ def prepare_datasets():
     
     # Check if cache exists
     schema = DATA_CONFIG.get('cache_schema', 'default')
+    schema = f"{schema}|test_mode={DATA_CONFIG.get('test_mode', 'sliding')}"
     schema_path = Path(cache_dir) / 'schema.txt' if cache_dir else None
 
     cache_exists = cache_dir and all(
@@ -434,6 +476,13 @@ def prepare_datasets():
         print('Cache schema changed. Clearing old caches (strategy A)...')
         for split in required_splits:
             path = Path(cache_dir) / f"{split}_samples.json"
+            if path.exists():
+                path.unlink()
+        optional_paths = [
+            Path(cache_dir) / 'test_last_item_samples.json',
+            Path(cache_dir) / 'test_last_item_prompts.json',
+        ]
+        for path in optional_paths:
             if path.exists():
                 path.unlink()
         cache_exists = False
@@ -450,6 +499,9 @@ def prepare_datasets():
                 path = Path(cache_dir) / f"{split}_samples.json"
                 if path.exists():
                     path.unlink()
+            extra_path = Path(cache_dir) / 'test_last_item_samples.json'
+            if extra_path.exists():
+                extra_path.unlink()
 
             builder = DatasetBuilder(
                 DATA_CONFIG['dataset_dir'],
@@ -505,7 +557,16 @@ def prepare_datasets():
                 'output': _to_angle_bracket_sid(sample['target_sid']),
             }
 
-        for split_name, dataset in [('train', train_dataset), ('val', val_dataset), ('test', test_dataset)]:
+        export_entries = [('train', train_dataset), ('val', val_dataset), ('test', test_dataset)]
+        test_last_item_path = Path(cache_dir) / 'test_last_item_samples.json' if cache_dir else None
+        if test_last_item_path and test_last_item_path.exists():
+            with open(test_last_item_path, 'r', encoding='utf-8') as file:
+                test_last_item_samples = json.load(file)
+            export_entries.append(
+                ('test_last_item', LLMFinetuneDataset(samples=test_last_item_samples, split='test'))
+            )
+
+        for split_name, dataset in export_entries:
             prompts = [_to_prompt_record(dataset, sample) for sample in dataset.samples]
             prompt_path = export_dir / f'{split_name}_prompts.json'
             _write_json_atomic(prompt_path, prompts, ensure_ascii=False, indent=2)

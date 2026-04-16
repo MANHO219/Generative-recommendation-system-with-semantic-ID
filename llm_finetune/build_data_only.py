@@ -20,10 +20,12 @@ def _remove_cache_files(cache_dir: Path) -> None:
         cache_dir / 'train_samples.json',
         cache_dir / 'val_samples.json',
         cache_dir / 'test_samples.json',
+        cache_dir / 'test_last_item_samples.json',
         cache_dir / 'schema.txt',
         cache_dir / 'train_prompts.json',
         cache_dir / 'val_prompts.json',
         cache_dir / 'test_prompts.json',
+        cache_dir / 'test_last_item_prompts.json',
     ]
     for path in targets:
         if path.exists():
@@ -39,6 +41,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--cache_dir', type=str, default=None, help='样本缓存输出目录')
     parser.add_argument('--prompt_export_dir', type=str, default=None, help='prompt 导出目录')
     parser.add_argument('--min_user_interactions', type=int, default=None, help='用户最小有效访问数阈值（默认取 config）')
+    parser.add_argument('--test_mode', type=str, default=None, choices=['sliding', 'last_item'], help='测试口径：sliding 或 last_item')
+    parser.add_argument('--no_export_last_item_test', action='store_true', help='在 sliding 模式下不额外导出 test_last_item_* 文件')
     parser.add_argument('--strict_kcore', action='store_true', help='构建前执行严格 k-core 闭包过滤')
     parser.add_argument('--k_core', type=int, default=None, help='严格 k-core 的 k 值（默认取 config）')
     parser.add_argument('--k_core_output_dir', type=str, default=None, help='严格 k-core 输出目录（默认 dataset_dir/.cache/kcore_<k>）')
@@ -69,6 +73,10 @@ def main() -> None:
 
     if args.min_user_interactions is not None:
         DATA_CONFIG['min_user_interactions'] = max(2, int(args.min_user_interactions))
+
+    if args.test_mode is not None:
+        DATA_CONFIG['test_mode'] = args.test_mode
+    DATA_CONFIG['export_last_item_test'] = not args.no_export_last_item_test
 
     DATA_CONFIG['enable_strict_kcore'] = bool(args.strict_kcore)
     if args.k_core is not None:
