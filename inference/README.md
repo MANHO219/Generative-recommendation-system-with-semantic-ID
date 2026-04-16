@@ -24,6 +24,8 @@ python -m inference.run_inference --help
 `run_inference.py` 当前支持以下参数：
 - `--model_path`
 - `--base_model_path`（可选，LoRA 适配器缺少 base 信息时可显式指定）
+- `--torch_dtype`（可选，`auto/bfloat16/float16/float32`）
+- `--attn_implementation`（可选，例如 `flash_attention_2`）
 - `--semantic_ids_path`
 - `--sample_json`（可选）
 - `--eval_samples_path`（可选，批量评测输入）
@@ -37,12 +39,35 @@ python -m inference.run_inference --help
 - `--top_k`（可选）
 - `--temperature`（可选）
 
+## 4B 与 8B 推理区分（推荐）
+
+- `4B LoRA`：建议 `--base_model_path` 指向本地 Qwen3-4B 缓存目录（或其 snapshot）。
+- `8B LoRA`：建议 `--base_model_path` 指向本地 8B 基座目录。
+- 两者都使用同一个 `run_inference.py`，只需替换 `model_path/base_model_path`。
+
 ### 2）单样本推理（你的 LoRA checkpoint）
+
+#### 2.1 4B LoRA
+
+```bash
+cd /mnt/data/liuwei/yewenhao/main
+CUDA_VISIBLE_DEVICES=2 PYTHONNOUSERSITE=1 /mnt/data/liuwei/anaconda3/envs/ywh/bin/python -m inference.run_inference \
+  --model_path /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_4b_50k2k/checkpoint-3500 \
+  --base_model_path /mnt/data/liuwei/yewenhao/main/models/models--Qwen--Qwen3-4B-Instruct-2507 \
+  --torch_dtype float16 \
+  --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids.json \
+  --sample_json /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore/test_samples.json \
+  --num_beams 5 --max_new_tokens 30 --temperature 0
+```
+
+#### 2.2 8B LoRA
 
 ```bash
 cd /mnt/data/liuwei/yewenhao/main
 CUDA_VISIBLE_DEVICES=2 PYTHONNOUSERSITE=1 /mnt/data/liuwei/anaconda3/envs/ywh/bin/python -m inference.run_inference \
   --model_path /mnt/data/liuwei/yewenhao/main/checkpoints/llm_sid/final_model \
+  --base_model_path /mnt/data/liuwei/yewenhao/main/models/JunHowie/Qwen3-8B-Instruct \
+  --torch_dtype bfloat16 \
   --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids_v2.json \
   --sample_json /mnt/data/liuwei/yewenhao/main/output/dataset_cache/test_samples.json \
   --num_beams 5 --max_new_tokens 30 --temperature 0
@@ -62,11 +87,35 @@ CUDA_VISIBLE_DEVICES=2 PYTHONNOUSERSITE=1 /mnt/data/liuwei/anaconda3/envs/ywh/bi
 
 ### 4）批量评测（方案 A，主脚本内完成）
 
+#### 4.1 4B LoRA（推荐先跑）
+
+```bash
+cd /mnt/data/liuwei/yewenhao/main
+CUDA_VISIBLE_DEVICES=2 PYTHONNOUSERSITE=1 /mnt/data/liuwei/anaconda3/envs/ywh/bin/python -m inference.run_inference \
+  --model_path /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_4b_50k2k/checkpoint-3500 \
+  --base_model_path /mnt/data/liuwei/yewenhao/main/models/models--Qwen--Qwen3-4B-Instruct-2507 \
+  --torch_dtype float16 \
+  --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids.json \
+  --eval_samples_path /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore/test_prompts.json \
+  --eval_limit 2000 \
+  --num_beams 20 \
+  --top_k 20 \
+  --max_new_tokens 30 \
+  --temperature 0 \
+  --print_examples 10 \
+  --log_every 50 \
+  --eval_report_path /mnt/data/liuwei/yewenhao/main/output/inference/yelp_4b_top20_summary.json \
+  --eval_predictions_path /mnt/data/liuwei/yewenhao/main/output/inference/yelp_4b_top20.jsonl
+```
+
+#### 4.2 8B LoRA
+
 ```bash
 cd /mnt/data/liuwei/yewenhao/main
 CUDA_VISIBLE_DEVICES=2 PYTHONNOUSERSITE=1 /mnt/data/liuwei/anaconda3/envs/ywh/bin/python -m inference.run_inference \
   --model_path /mnt/data/liuwei/yewenhao/main/checkpoints/llm_sid/final_model \
   --base_model_path /mnt/data/liuwei/yewenhao/main/models/JunHowie/Qwen3-8B-Instruct \
+  --torch_dtype bfloat16 \
   --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids_v2.json \
   --eval_samples_path /mnt/data/liuwei/yewenhao/main/output/dataset_cache/test_samples.json \
   --eval_limit 500 \
