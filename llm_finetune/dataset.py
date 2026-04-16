@@ -8,6 +8,8 @@ import json
 import os
 import random
 import re
+import logging
+import sys
 from datetime import datetime
 from typing import Dict, List, Any
 import pandas as pd
@@ -17,6 +19,43 @@ try:
     from .config import DATA_CONFIG, PROMPT_TEMPLATE
 except ImportError:
     from config import DATA_CONFIG, PROMPT_TEMPLATE
+
+
+def _maybe_apply_strict_kcore() -> None:
+    if not DATA_CONFIG.get('enable_strict_kcore', False):
+        return
+
+    try:
+        from semantic_id.kcore import prepare_k_core_data_dir
+    except Exception as err:
+        project_root = Path(__file__).resolve().parents[1]
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+        try:
+            from semantic_id.kcore import prepare_k_core_data_dir
+        except Exception as inner_err:
+            raise RuntimeError(f'无法导入 strict k-core 模块: {inner_err}') from inner_err
+
+    source_dir = DATA_CONFIG['dataset_dir']
+    k_value = int(DATA_CONFIG.get('k_core', 5))
+    use_cache = bool(DATA_CONFIG.get('k_core_use_cache', True))
+    output_dir = DATA_CONFIG.get('k_core_output_dir')
+
+    filtered_dir, stats = prepare_k_core_data_dir(
+        data_dir=source_dir,
+        k=k_value,
+        output_dir=output_dir,
+        use_cache=use_cache,
+    )
+    DATA_CONFIG['dataset_dir'] = filtered_dir
+    logging.info(
+        'Strict k-core enabled: k=%s users=%s items=%s interactions=%s dir=%s',
+        stats.get('k'),
+        stats.get('users'),
+        stats.get('items'),
+        stats.get('interactions'),
+        filtered_dir,
+    )
 
 
 def _write_json_atomic(path: Path, data: Any, *, ensure_ascii: bool = False, indent: int | None = None) -> None:
@@ -255,10 +294,13 @@ class DatasetBuilder:
         print("Processing user histories and generating samples...")
         samples = []
         max_history = DATA_CONFIG['max_history_length']
+        min_user_interactions = int(DATA_CONFIG.get('min_user_interactions', 2))
+        min_user_interactions = max(2, min_user_interactions)
         
         grouped = reviews_df.groupby('user_id')
         total_groups = len(grouped)
         count = 0
+        kept_user_count = 0
         
         for user_id, group in grouped:
             count += 1
@@ -289,8 +331,9 @@ class DatasetBuilder:
                     'sid': _to_angle_bracket_sid(semantic_ids[business_id]),
                 })
 
-            if len(visits) < 2:
+            if len(visits) < min_user_interactions:
                 continue
+            kept_user_count += 1
 
             # Get user info
             if user_id not in users_dict:
@@ -320,6 +363,10 @@ class DatasetBuilder:
                 samples.append(sample)
         
         print(f"Generated {len(samples)} total samples. Splitting...")
+        print(
+            f"Users kept after min interactions filter: {kept_user_count}/{total_groups} "
+            f"(min_user_interactions={min_user_interactions})"
+        )
         
         # Deterministic shuffle and split
         random.seed(42)  # Ensure reproducibility
@@ -368,6 +415,8 @@ class DatasetBuilder:
 
 def prepare_datasets():
     """准备训练/验证/测试数据集"""
+    _maybe_apply_strict_kcore()
+
     cache_dir = DATA_CONFIG.get('cache_dir')
     required_splits = ['train', 'val', 'test']
     

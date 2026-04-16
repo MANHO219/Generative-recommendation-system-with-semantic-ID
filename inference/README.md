@@ -112,9 +112,9 @@ python /mnt/data/liuwei/yewenhao/main/inference/hr_eval.py \
   --save_path /mnt/data/liuwei/yewenhao/main/output/llamafactory/gnpr_qwen3_4b_lora_predict/hr_metrics_k5.json
 
 python /mnt/data/liuwei/yewenhao/main/inference/hr_eval.py \
-  --pred_file /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_10k2k_predict/generated_predictions.jsonl \
+  --pred_file /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_50k2k_predict/generated_predictions.jsonl \
   --top_k 20 \
-  --save_path /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_10k2k_predict/hr_metrics_k5.json
+  --save_path /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_50k2k_predict/hr_metrics_k5.json
 ```
 
 输出指标包括：

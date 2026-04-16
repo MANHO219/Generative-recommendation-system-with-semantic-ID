@@ -53,11 +53,16 @@ TRAINING_CONFIG = {
 # 数据配置
 DATA_CONFIG = {
     'dataset_dir': str(_BASE_DIR / 'dataset/yelp/processed/Philadelphia'),  # 数据集目录
-    'semantic_ids_path': str(_BASE_DIR / 'output/sid/PA_main_city/semantic_ids_v2.json'),
+    'semantic_ids_path': str(_BASE_DIR / 'output/sid/PA_main_city/semantic_ids.json'),
     'train_split': 0.8,
     'val_split': 0.1,
     'test_split': 0.1,
     'max_history_length': 50,  # 用户历史最多50条
+    'min_user_interactions': 5,  # 显式用户筛选：至少保留 5 条有效访问
+    'enable_strict_kcore': False,
+    'k_core': 5,
+    'k_core_use_cache': True,
+    'k_core_output_dir': None,
     'cache_dir': str(_BASE_DIR / 'output/dataset_cache'),  # 缓存目录
     'cache_schema': 'sid_time_history_angle_bracket_gnpr',
     'export_prompts_on_prepare': True,

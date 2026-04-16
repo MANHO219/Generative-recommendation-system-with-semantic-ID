@@ -19,10 +19,11 @@ pip install torch einops pyyaml
 ```bash
 cd D:\作业\毕业设计\main
 python semantic_id/train.py \
-    --data_dir ./dataset/yelp/processed \
+    --data_dir ./dataset/yelp/processed/Philadelphia \
     --preset base \
     --epochs 100 \
     --batch_size 128 \
+    --k_core 5 \
     --device cuda
 ```
 
@@ -49,6 +50,42 @@ python semantic_id/train.py \
 | `--lr` | 1e-3 | 学习率 |
 | `--resume` | - | 从检查点恢复训练（传入 `.pt` 路径） |
 | `--config` | - | 自定义配置文件（JSON/YAML），覆盖默认值 |
+| `--k_core` | 读取 `config.data.k_core`（默认 5） | 训练前执行迭代 k-core 过滤（user/item 双向直到收敛） |
+| `--k_core_no_cache` | `False` | 不复用缓存，每次重新生成过滤后数据 |
+
+### 训练前 k-core 过滤（已接入）
+
+Semantic ID 训练与 codebook 学习现在默认会先执行 k-core（默认 5-core），再开始训练。
+
+- 过滤对象：`review_filtered.json`/`review_poi.json` 中的 `user_id-business_id` 交互
+- 过滤逻辑：迭代 user/item 双向过滤，直到数据规模稳定
+- 同步输出：会同步过滤 `business_poi.json`、`checkin_poi.json`、`user_active.json`
+- 缓存目录：`<data_dir>/.cache/kcore_<k>/`
+
+你可以通过配置文件关闭或调整：
+
+```python
+'data': {
+    'data_dir': './dataset/yelp/processed',
+    'k_core': 5,  # <=1 时不启用
+}
+```
+
+命令行示例：
+
+```bash
+python semantic_id/train.py \
+    --data_dir ./dataset/yelp/processed \
+    --k_core 5 \
+    --device cuda
+
+# 强制重建 k-core 缓存
+python semantic_id/train.py \
+    --data_dir ./dataset/yelp/processed \
+    --k_core 5 \
+    --k_core_no_cache \
+    --device cuda
+```
 
 ### 预设配置对比
 
@@ -74,6 +111,7 @@ python semantic_id/train.py \
 semantic_id/
 ├── train.py       # 训练入口脚本（自动选择数据集）
 ├── config.py      # 配置管理（DEFAULT_CONFIG + 预设模板 + GNPR-SID V2 配置）
+├── kcore.py       # 训练前 k-core 过滤（迭代收敛 + 缓存）
 ├── dataset.py     # 数据加载（YelpPOIDataset / GNPRSIDPOIDataset）
 ├── encoder.py     # 特征编码器（MultiSourceEncoder、GeoEncoder）
 ├── quantizer.py   # 残差量化器（VectorQuantizer、ResidualQuantizer）

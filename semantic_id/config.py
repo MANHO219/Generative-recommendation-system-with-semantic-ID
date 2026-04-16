@@ -17,7 +17,8 @@ DEFAULT_CONFIG = {
         'data_dir': './dataset/yelp/processed',
         'max_categories': 5,
         'include_checkins': True,
-        'include_users': True
+        'include_users': True,
+        'k_core': 5
     },
     
     # 模型配置

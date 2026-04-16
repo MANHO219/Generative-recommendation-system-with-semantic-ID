@@ -2,6 +2,40 @@
 
 ## 训练命令
 
+## 仅构建数据缓存（不启动训练）
+
+```bash
+PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+/mnt/data/liuwei/anaconda3/envs/ywh/bin/python \
+/mnt/data/liuwei/yewenhao/main/llm_finetune/build_data_only.py \
+    --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids.json \
+    --min_user_interactions 5 \
+    --strict_kcore --k_core 5 \
+    --cache_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore \
+    --prompt_export_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore \
+    --force_rebuild
+```
+
+- 该命令只会调用 `prepare_datasets()`，生成：
+    - `train/val/test_samples.json`
+    - `train/val/test_prompts.json`（默认导出，可用 `--no_export_prompts` 关闭）
+- `--min_user_interactions` 会在构建时显式过滤用户（按“可映射到 SID 的有效 visits 数”计数），推荐设为 `5` 以对齐 k-core 口径。
+- `--strict_kcore --k_core 5` 会在构建前调用 `semantic_id/kcore.py` 的迭代闭包过滤逻辑，确保用户/商铺双向闭包一致。
+- 更换新的 codebook/SID 后，建议加 `--force_rebuild` 强制重建缓存。
+
+### 直接训练（含严格闭包）
+```bash
+CUDA_VISIBLE_DEVICES=0 PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+/mnt/data/liuwei/anaconda3/envs/ywh/bin/python \
+/mnt/data/liuwei/yewenhao/main/llm_finetune/trainer.py \
+    --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids.json \
+    --min_user_interactions 5 \
+    --strict_kcore --k_core 5 \
+    --force_rebuild_cache
+```
+
+- 训练入口和 `build_data_only.py` 现在共用同一 `prepare_datasets()`，严格闭包逻辑一致。
+
 ### 单卡训练
 ```bash
 CUDA_VISIBLE_DEVICES=0 PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \

@@ -9,6 +9,7 @@ import json
 import time
 import sys
 import re
+import argparse
 import warnings
 import inspect
 from pathlib import Path
@@ -584,6 +585,42 @@ class LLMFinetune:
 
 def main():
     """主训练流程"""
+    parser = argparse.ArgumentParser(description='LLM finetune training entry')
+    parser.add_argument('--strict_kcore', action='store_true', help='训练前执行严格 k-core 闭包过滤')
+    parser.add_argument('--k_core', type=int, default=None, help='严格 k-core 的 k 值（默认取 config）')
+    parser.add_argument('--k_core_output_dir', type=str, default=None, help='严格 k-core 输出目录')
+    parser.add_argument('--k_core_no_cache', action='store_true', help='严格 k-core 不复用缓存，强制重算')
+    parser.add_argument('--min_user_interactions', type=int, default=None, help='用户最小有效访问数阈值（默认取 config）')
+    parser.add_argument('--dataset_dir', type=str, default=None, help='训练数据目录（可覆盖 config）')
+    parser.add_argument('--semantic_ids_path', type=str, default=None, help='semantic_ids.json 路径（可覆盖 config）')
+    parser.add_argument('--force_rebuild_cache', action='store_true', help='训练前删除 dataset cache 强制重建')
+    args = parser.parse_args()
+
+    if args.dataset_dir:
+        DATA_CONFIG['dataset_dir'] = str(Path(args.dataset_dir).resolve())
+    if args.semantic_ids_path:
+        DATA_CONFIG['semantic_ids_path'] = str(Path(args.semantic_ids_path).resolve())
+    if args.min_user_interactions is not None:
+        DATA_CONFIG['min_user_interactions'] = max(2, int(args.min_user_interactions))
+
+    DATA_CONFIG['enable_strict_kcore'] = bool(args.strict_kcore)
+    if args.k_core is not None:
+        DATA_CONFIG['k_core'] = int(args.k_core)
+    if args.k_core_output_dir:
+        DATA_CONFIG['k_core_output_dir'] = str(Path(args.k_core_output_dir).resolve())
+    if args.k_core_no_cache:
+        DATA_CONFIG['k_core_use_cache'] = False
+
+    if args.force_rebuild_cache:
+        cache_dir = Path(DATA_CONFIG['cache_dir'])
+        for filename in [
+            'train_samples.json', 'val_samples.json', 'test_samples.json',
+            'train_prompts.json', 'val_prompts.json', 'test_prompts.json', 'schema.txt',
+        ]:
+            path = cache_dir / filename
+            if path.exists():
+                path.unlink()
+
     # 初始化训练器
     llm_finetune = LLMFinetune()
     
