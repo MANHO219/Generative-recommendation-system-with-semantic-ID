@@ -25,6 +25,46 @@ PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
 - `--strict_kcore --k_core 5` 会在构建前调用 `semantic_id/kcore.py` 的迭代闭包过滤逻辑，确保用户/商铺双向闭包一致。
 - 更换新的 codebook/SID 后，建议加 `--force_rebuild` 强制重建缓存。
 
+### 两种预处理流程
+
+通过 `--preprocess_pipeline` 选择数据预处理流程：
+
+| 流程 | 说明 |
+|------|------|
+| `legacy`（默认） | 原始滑动窗口方式，min_user_interactions 控制用户过滤 |
+| `yelp_session` | NYC 风格会话切分，含全局时间切分、24h 孤立点剔除、会话切分、冷启动消除 |
+
+### Yelp Session 流程参数（preprocess_pipeline=yelp_session）
+
+```bash
+PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+/mnt/data/liuwei/anaconda3/envs/ywh/bin/python \
+/mnt/data/liuwei/yewenhao/main/llm_finetune/build_data_only.py \
+    --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids.json \
+    --preprocess_pipeline yelp_session \
+    --session_enable_filter_low_frequency \
+    --session_min_poi_freq 10 \
+    --session_min_user_freq 10 \
+    --session_time_interval_min 1440 \
+    --no_session_remove_isolated_24h \
+    --no_session_ignore_singleton_sessions \
+    --no_session_remove_unseen_user_poi \
+    --strict_kcore --k_core 5 \
+    --cache_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_yelp_session \
+    --force_rebuild
+```
+
+**Yelp Session Pipeline 处理步骤**：
+
+1. `filter_low_frequency`：过滤 review 中访问次数 ≤10 的 POI 和活跃度 ≤10 的用户
+2. `split_by_global_time`：全局时间顺序切分 80%/10%/10%（train/val/test）
+3. `remove_isolated_24h`：剔除前后时间间隔均超过 24 小时的孤立访问记录
+4. `build_pseudo_sessions`：按时间间隙（默认 1440 分钟）切分会话
+5. `ignore_singleton_sessions`：剔除仅包含单个访问点的会话
+6. `remove_unseen_user_poi`：确保 val/test 中的用户和 POI 在 train 中均出现过（消除冷启动）
+
+**注意**：`--strict_kcore --k_core 5` 会在 Session Pipeline 之前执行独立的数据闭包过滤，与 `session_enable_filter_low_frequency` 串联生效。
+
 ### 公平对齐口径（每用户最后一次目标）
 
 ```bash
@@ -41,8 +81,9 @@ PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
 ```
 
 - `--test_mode last_item` 下：
-    - `test_samples.json` 将变为“每用户仅一条最后目标”测试集。
+    - `test_samples.json` 将变为”每用户仅一条最后目标”测试集。
     - `train/val` 仍来自滑窗样本（去除了每用户最后一条，避免与测试目标重叠）。
+- `--preprocess_pipeline=yelp_session` 时，`test_mode` 参数被忽略，测试集直接来自 Session Pipeline 的全局时间切分。
 
 ### 提取 10k/2k/2k 子集（快速实验）
 
@@ -84,10 +125,15 @@ CUDA_VISIBLE_DEVICES=0 PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
     --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids.json \
     --min_user_interactions 5 \
     --strict_kcore --k_core 5 \
+    --preprocess_pipeline yelp_session \
+    --session_enable_filter_low_frequency \
+    --session_min_poi_freq 10 \
+    --session_min_user_freq 10 \
     --force_rebuild_cache
 ```
 
-- 训练入口和 `build_data_only.py` 现在共用同一 `prepare_datasets()`，严格闭包逻辑一致。
+- 训练入口和 `build_data_only.py` 共用同一 `prepare_datasets()`，参数同步透传。
+- `--preprocess_pipeline yelp_session` 启用 NYC 风格会话 pipeline，与 `strict_kcore` 串联生效。
 
 ### 单卡训练
 ```bash
