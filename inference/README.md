@@ -91,21 +91,21 @@ CUDA_VISIBLE_DEVICES=2 PYTHONNOUSERSITE=1 /mnt/data/liuwei/anaconda3/envs/ywh/bi
 
 ```bash
 cd /mnt/data/liuwei/yewenhao/main
-CUDA_VISIBLE_DEVICES=2 PYTHONNOUSERSITE=1 /mnt/data/liuwei/anaconda3/envs/ywh/bin/python -m inference.run_inference \
+CUDA_VISIBLE_DEVICES=3 PYTHONNOUSERSITE=1 /mnt/data/liuwei/anaconda3/envs/ywh/bin/python -m inference.run_inference \
   --model_path /mnt/data/liuwei/yewenhao/main/output/llamafactory/yelp_prompts_phil_lora_4b_50k2k/checkpoint-3500 \
   --base_model_path /mnt/data/liuwei/yewenhao/main/models/models--Qwen--Qwen3-4B-Instruct-2507 \
   --torch_dtype float16 \
   --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids.json \
-  --eval_samples_path /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore/test_prompts.json \
+  --eval_samples_path /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore_10k2k/test_prompts.json \
   --eval_limit 2000 \
-  --num_beams 20 \
-  --top_k 20 \
+  --num_beams 10 \
+  --top_k 10 \
   --max_new_tokens 30 \
   --temperature 0 \
-  --print_examples 10 \
+  --print_examples 100 \
   --log_every 50 \
-  --eval_report_path /mnt/data/liuwei/yewenhao/main/output/inference/yelp_4b_top20_summary.json \
-  --eval_predictions_path /mnt/data/liuwei/yewenhao/main/output/inference/yelp_4b_top20.jsonl
+  --eval_report_path /mnt/data/liuwei/yewenhao/main/output/inference/yelp_4b_top10_summary.json \
+  --eval_predictions_path /mnt/data/liuwei/yewenhao/main/output/inference/yelp_4b_top10.jsonl
 ```
 
 #### 4.2 8B LoRA

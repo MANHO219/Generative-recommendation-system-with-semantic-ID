@@ -221,6 +221,44 @@ def _resolve_torch_dtype(dtype_name: str):
     raise ValueError(f"Unsupported torch dtype: {dtype_name}")
 
 
+def _is_extra_special_tokens_compat_error(error: Exception) -> bool:
+    message = str(error)
+    return isinstance(error, AttributeError) and "has no attribute 'keys'" in message
+
+
+def _load_tokenizer_with_fallback(model_path: str, fallback_path: Optional[str] = None):
+    candidate_paths = [model_path]
+    if fallback_path and fallback_path != model_path:
+        candidate_paths.append(fallback_path)
+
+    attempts = [
+        {},
+        {"extra_special_tokens": {}},
+        {"extra_special_tokens": {}, "use_fast": False},
+    ]
+
+    last_error: Optional[Exception] = None
+    for path in candidate_paths:
+        for kwargs in attempts:
+            try:
+                if kwargs:
+                    print(f"[Info] loading tokenizer from: {path} with fallback kwargs={kwargs}")
+                else:
+                    print(f"[Info] loading tokenizer from: {path}")
+                return AutoTokenizer.from_pretrained(path, trust_remote_code=True, **kwargs)
+            except Exception as error:
+                last_error = error
+                if _is_extra_special_tokens_compat_error(error):
+                    continue
+                if isinstance(error, OSError):
+                    break
+                raise
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Failed to load tokenizer with fallback strategy.")
+
+
 def load_model_and_tokenizer(
     model_path: str,
     base_model_path: Optional[str] = None,
@@ -240,7 +278,10 @@ def load_model_and_tokenizer(
             raise ValueError("Adapter checkpoint requires --base_model_path or valid base_model_name_or_path.")
         resolved_base_model = _resolve_hf_snapshot_path(resolved_base_model)
 
-        tokenizer = AutoTokenizer.from_pretrained(resolved_model_path, trust_remote_code=True)
+        tokenizer = _load_tokenizer_with_fallback(
+            model_path=resolved_model_path,
+            fallback_path=resolved_base_model,
+        )
         model_kwargs = {
             "device_map": "auto",
             "trust_remote_code": True,
@@ -259,7 +300,7 @@ def load_model_and_tokenizer(
         print(f"[Info] loaded base model: {resolved_base_model}")
         return model, tokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(resolved_model_path, trust_remote_code=True)
+    tokenizer = _load_tokenizer_with_fallback(model_path=resolved_model_path)
     model_kwargs = {
         "device_map": "auto",
         "trust_remote_code": True,

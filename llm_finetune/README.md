@@ -44,6 +44,38 @@ PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
     - `test_samples.json` 将变为“每用户仅一条最后目标”测试集。
     - `train/val` 仍来自滑窗样本（去除了每用户最后一条，避免与测试目标重叠）。
 
+### 提取 10k/2k/2k 子集（快速实验）
+
+如果你已经构建好了完整缓存，可以二次抽样出 `train=10000`、`val=2000`、`test=2000`：
+
+```bash
+PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+/mnt/data/liuwei/anaconda3/envs/ywh/bin/python \
+/mnt/data/liuwei/yewenhao/main/llm_finetune/extract_subset.py \
+    --source_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore \
+    --target_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore_10k2k2k \
+    --train_n 50000 \
+    --val_n 10000 \
+    --test_n 10000
+```
+
+如果测试要采用 STAN 对齐口径（每用户最后一次），可把测试来源切到 `test_last_item`：
+
+```bash
+PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+/mnt/data/liuwei/anaconda3/envs/ywh/bin/python \
+/mnt/data/liuwei/yewenhao/main/llm_finetune/extract_subset.py \
+    --source_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore \
+    --target_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore_10k2k2k_last \
+    --train_n 10000 \
+    --val_n 2000 \
+    --test_n 2000 \
+    --test_source test_last_item
+```
+
+- 输出包含：`train/val/test_{samples,prompts}.json` 与 `subset_manifest.json`。
+- 默认随机抽样（`seed=42`）；若想按原顺序截取前 N 条，增加 `--no_shuffle`。
+
 ### 直接训练（含严格闭包）
 ```bash
 CUDA_VISIBLE_DEVICES=0 PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
@@ -94,6 +126,7 @@ rm -rf /mnt/data/liuwei/yewenhao/main/output/dataset_cache/
 llm_finetune/
 ├── config.py       # 所有配置（模型、LoRA、训练、数据、Prompt 模板）
 ├── dataset.py      # 数据集构建与缓存（DatasetBuilder、LLMFinetuneDataset、prepare_datasets）
+├── extract_subset.py # 从完整缓存提取固定规模子集（如 10k/2k/2k）
 ├── trainer.py      # 训练器主体（LLMFinetune：加载模型、训练、评估）
 ├── requirements.txt
 └── README.md
