@@ -1,0 +1,466 @@
+\chapter{基于RQ-VAE的语义ID生成与冲突解决}
+\label{chap:rqvae_sid}
+
+\section{多源特征编码器}
+\label{sec:feature_encoder}
+
+\subsection{特征构成}
+\label{sec:feature构成}
+
+POI的多维特征构成如表所示：
+
+\begin{table}[htbp]
+\centering
+\caption{POI特征构成}
+\label{tab:poi_features}
+\begin{tabular}{lll}
+\toprule
+特征类型 & 维度 & 说明 \\
+\midrule
+category\_emb & 64 & 类别嵌入（SentenceTransformer或可学习） \\
+spatial\_3d & 3 & 球坐标（lat/lon $\rightarrow$ 3D单位球面） \\
+fourier\_time & 12 & Fourier时间特征（6频率 $\times$ sin/cos） \\
+attr\_emb & 64 (可选) & Attributes文本嵌入 \\
+\midrule
+总计 & 79 (无attr) / 143 (有attr) & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{类别编码器}
+\label{sec:category_encoder}
+
+类别编码器支持两种模式：
+\begin{itemize}
+    \item \textbf{预训练嵌入}：使用SentenceTransformer (all-MiniLM-L6-v2) 生成语义向量
+    \item \textbf{可学习嵌入}：随机初始化，通过训练学习类别表示
+\end{itemize}
+
+多标签场景下，对所有类别嵌入取平均池化：
+
+\begin{equation}
+\mathbf{e}_{cat} = \frac{\sum_{j=1}^{N} \mathbf{e}_j \cdot \mathbb{1}_{c_j > 0}}{\sum_{j=1}^{N} \mathbb{1}_{c_j > 0}}
+\label{eq:category_pooling}
+\end{equation}
+
+其中 $\mathbf{e}_j$ 为第 $j$ 个类别的嵌入向量，$c_j$ 为类别ID（大于0表示有效）。
+
+\textbf{图示}：\figurename~\ref{fig:category_encoder}（待补充）
+
+\subsection{空间坐标编码}
+\label{sec:spatial_encoder}
+
+将经纬度转换为3D球坐标，保持地理距离的几何特性：
+
+\begin{equation}
+\begin{aligned}
+x &= \cos(\phi) \cdot \cos(\lambda) \\
+y &= \cos(\phi) \cdot \sin(\lambda) \\
+z &= \sin(\phi)
+\end{aligned}
+\label{eq:3d_sphere}
+\end{equation}
+
+其中 $\phi = \text{radians}(lat)$，$\lambda = \text{radians}(lon)$。
+
+\textbf{图示}：\figurename~\ref{fig:spatial_encoding}（待补充）
+
+该表示将地球表面映射到单位球面上，使得地理上相近的POI在向量空间中也相近。
+
+\subsection{Fourier时间特征}
+\label{sec:fourier_time}
+
+编码访问时间的周期性模式（12维，6频率 $\times$ sin/cos）：
+
+\begin{equation}
+f_k^{sin} = \sin\left(\frac{2\pi k \cdot h}{24}\right), \quad
+f_k^{cos} = \cos\left(\frac{2\pi k \cdot h}{24}\right), \quad k = 1, 2, \dots, 6
+\label{eq:fourier_time}
+\end{equation}
+
+其中 $h$ 为访问时间的小时（0-24）。
+
+Fourier特征能够有效捕捉时间序列的周期性规律，如``早高峰''、``午休''、``晚间活动''等模式。
+
+\section{RQ-VAE语义ID生成框架}
+\label{sec:rqvae_framework}
+
+\subsection{模型架构}
+\label{sec:rqvae_arch}
+
+RQ-VAE的核心架构如图所示：
+
+\begin{equation}
+\text{Input} \xrightarrow{} \text{Encoder} \xrightarrow{} \text{RQ} \xrightarrow{} \text{Decoder} \xrightarrow{} \text{Output}
+\end{equation}
+
+RQ-VAE将多源特征编码器输出的特征向量作为输入，通过Encoder映射到64维的连续语义空间，然后通过残差量化器（RQ）将连续向量量化为三层离散的Semantic ID，最后通过Decoder重构原始特征向量进行验证。
+
+\textbf{图示}：\figurename~\ref{fig:rqvae_arch}（待补充）
+
+简化Encoder采用单层线性变换：
+
+\begin{equation}
+\mathbf{h} = \text{LayerNorm}\left(\text{GELU}\left(\mathbf{W}_e \mathbf{x} + \mathbf{b}_e\right)\right)
+\label{eq:encoder_simple}
+\end{equation}
+
+其中 $\mathbf{x} \in \mathbb{R}^{79}$ 为输入特征，$\mathbf{h} \in \mathbb{R}^{64}$ 为编码后的隐向量。
+
+原始方案采用多层MLP结构：
+\begin{equation}
+\text{Encoder}_{MLP} = [79, 512, 256, 128, 64]
+\label{eq:encoder_mlp}
+\end{equation}
+
+RQ-VAE的主要超参数如表所示：
+
+\begin{table}[htbp]
+\centering
+\caption{RQ-VAE核心参数配置}
+\label{tab:rqvae_params}
+\begin{tabular}{ll}
+\toprule
+参数 & 默认值 \\
+\midrule
+input\_dim & 79 \\
+embedding\_dim & 64 \\
+num\_quantizers & 3 \\
+codebook\_size & 128 \\
+commitment\_cost & 0.25 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{残差量化器}
+\label{sec:residual_quantizer}
+
+残差量化器的核心机制如算法所示：
+
+\begin{algorithm}[htbp]
+\caption{残差量化算法}
+\label{alg:rq}
+\begin{algorithmic}[1]
+\State $residual \gets z$ \Comment{输入向量 $z$（64维）}
+\State $quantized\_sum \gets \mathbf{0}$ \Comment{初始化累加向量}
+\For{$i \gets 1$ \textbf{to} $num\_quantizers$}
+    \State $quantized\_i, indices\_i, loss\_i \gets quantizer\_i(residual)$ \Comment{第 $i$ 层量化}
+    \State $quantized\_sum \gets quantized\_sum + quantized\_i$ \Comment{累加量化向量}
+    \State $residual \gets residual - quantized\_i$ \Comment{计算残差传递到下一层}
+\EndFor
+\State \Return $quantized\_sum, [indices\_1, indices\_2, indices\_3]$ \Comment{返回量化向量和三组索引}
+\end{algorithmic}
+\end{algorithm}
+
+\textbf{算法说明}：
+\begin{itemize}
+    \item 第1-2行：初始化残差向量和累加器
+    \item 第3-7行：循环执行三层残差量化
+    \item 第4行：每层使用独立码本将残差向量量化为128维码字之一
+    \item 第5行：将当前层的量化结果累加到总量化向量
+    \item 第6行：将残差减去量化值，传递给下一层继续量化
+    \item 第8行：返回最终量化向量和P1/P2/P3三层索引
+\end{itemize}
+
+各层采用独立码本，码本大小为codebook\_size。
+
+\textbf{EMA更新机制}：使用指数移动平均更新码本向量，死码（使用率低于平均值10\%）用随机样本重置。
+
+\section{三层量化流程}
+\label{sec:rq三层_quant}
+
+RQ-VAE三层残差量化流程：
+
+\begin{equation}
+\text{输入向量 } z \text{ (64维)}
+\end{equation}
+\begin{equation}
+\downarrow
+\end{equation}
+\begin{equation}
+\text{P1量化}: z \rightarrow q_1, \quad r_1 = z - q_1
+\end{equation}
+\begin{equation}
+\downarrow
+\end{equation}
+\begin{equation}
+\text{P2量化}: r_1 \rightarrow q_2, \quad r_2 = r_1 - q_2
+\end{equation}
+\begin{equation}
+\downarrow
+\end{equation}
+\begin{equation}
+\text{P3量化}: r_2 \rightarrow q_3
+\end{equation}
+\begin{equation}
+\downarrow
+\end{equation}
+\begin{equation}
+\text{最终量化向量}: q_1 + q_2 + q_3
+\end{equation}
+\begin{equation}
+\text{Semantic ID}: [idx_{P1}, idx_{P2}, idx_{P3}]
+\end{equation}
+
+其中P1层捕获宏观特征（地理大区、核心业态），P2层细化到城市级别特征，P3层编码细粒度差异。三层量化使得具有相似语义的POI在ID空间中相近。
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/prefix1_semantic.png}
+    \caption{第一层（P1）128个码字的Category与Region分布热力图}
+    \label{fig:prefix1_semantic}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/prefix2_semantic.png}
+    \caption{Prefix=1条件下P2层86个码字的Category与Region分布热力图}
+    \label{fig:prefix2_semantic}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/prefix3_semantic.png}
+    \caption{Prefix=1-11条件下P3层74个码字的Category与Region分布热力图}
+    \label{fig:prefix3_semantic}
+\end{figure}
+
+\textbf{图3.1-3.3分析}：三层量化呈现明显的语义逐层细化规律。
+
+\textbf{P1层宏观语义聚合}（图\ref{fig:prefix1_semantic}）：
+\begin{itemize}
+    \item \textbf{Category分布较为分散}：128个码字中，Top1纯度$\ge$90\%仅占11.7\%，72/128（56.3\%）的码字Top1占比低于70\%
+    \item 高度混合码字多为跨业态聚合，如码字22（Health \& Medical 20.5\% + Arts \& Entertainment 18.2\%）、码字96（Fitness 22.6\% + Arts \& Entertainment 22.6\%），反映P1层捕获粗粒度地理-业态联合特征
+    \item \textbf{Region分布高度碎片化}：90/128（70.3\%）的码字Top1邻里占比低于5\%，Region Top1均值仅4.7\%，说明P1层几乎不编码精确地理位置
+\end{itemize}
+
+\textbf{P2层城市级细化}（图\ref{fig:prefix2_semantic}）：
+\begin{itemize}
+    \item \textbf{Category纯度显著提升}：25/42（59.5\%）的码字达到Top1=100\%（完全纯净），高纯度（$\ge$90\%）占59.5\%
+    \item 剩余混合码字多为相近品类共存，如码字1-34（Health \& Medical 50\% + Shopping 50\%）、码字1-3（Barbers 60\% + Beauty \& Spas 20\%）
+    \item \textbf{Region分布集中度跃升}：11/42（26.2\%）的码字Top1邻里$\ge$50\%，Region Top1均值达46.5\%，表明P2层开始编码精确邻里级别的地理信息
+\end{itemize}
+
+\textbf{P3层细粒度消歧}（图\ref{fig:prefix3_semantic}）：
+\begin{itemize}
+    \item \textbf{Category纯度接近极值}：117/125（93.6\%）的码字Top1=100\%，仅8个码字存在品类共存，且均为近似品类对半分配（如Beauty \& Spas 50\% + Barbers 50\%、Health \& Medical 50\% + Counseling \& Mental Health 50\%）
+    \item \textbf{Region分布高度集中}：93/125（74.4\%）的码字Top1邻里$\ge$50\%，Region Top1均值达86.2\%，表明P3层主要编码精确到街区的地理细分
+    \item 少量P3码字仍存在Region Top1<50\%的情况，是因为同一街区内确实存在语义相近但实际不同的POI（如同一购物中心的不同店铺），此类冲突由冲突解决机制（$\langle d_{xx} \rangle$后缀）进一步消歧
+\end{itemize}
+
+\textbf{三层量化语义递增规律总结}：随着量化层级加深，Category语义纯度和Region地理集中度同步提升。P1层以粗粒度业态为主、地理为辅；P2层达到城市内邻里级别的语义-地理平衡；P3层聚焦到街区级精确语义，三层联合实现语义ID的层次化表征。
+
+\section{损失函数与训练策略}
+\label{sec:training_strategy}
+
+\subsection{总损失函数}
+\label{sec:rqvae_loss}
+
+总损失函数定义为：
+
+\begin{equation}
+\mathcal{L}_{total} = \mathcal{L}_{recon} + \mathcal{L}_{quant} + \mathcal{L}_{align} + \mathcal{L}_{diversity}
+\label{eq:rqvae_loss}
+\end{equation}
+
+其中：
+\begin{itemize}
+    \item $\mathcal{L}_{recon}$：重构损失，MSE(decoder\_output, input)
+    \item $\mathcal{L}_{quant}$：量化损失，commitment\_loss
+    \item $\mathcal{L}_{align}$：对齐损失，$1 -    cosine\_similarity(quantized, encoded)$
+    \item $\mathcal{L}_{diversity}$：码本均匀性损失（epoch $\geq$ 5后启用）
+\end{itemize}
+
+\textbf{设计说明}：
+\begin{itemize}
+    \item 重构损失确保量化后的向量仍保留原始特征信息
+    \item 对齐损失确保量化向量与编码向量保持语义一致性
+    \item 多样性损失延迟启用，避免训练初期干扰重构学习
+\end{itemize}
+
+\subsection{动态多样性权重}
+\label{sec:dynamic_diversity}
+
+针对长尾分布数据的Warm-up策略：
+\begin{itemize}
+    \item 训练初期权重较小，允许模型先学习粗粒度聚类
+    \item 逐渐增大权重，强制打散头部类别的拥堵
+\end{itemize}
+
+动态多样性权重的计算公式为：
+
+\begin{equation}
+w_{div}(e) =
+\begin{cases}
+w_{start} + \frac{e}{T_{warmup}} \cdot (w_{end} - w_{start}), & e < T_{warmup} \\
+w_{end}, & e \geq T_{warmup}
+\end{cases}
+\label{eq:dynamic_diversity}
+\end{equation}
+
+其中 $e$ 为当前epoch，$T_{warmup}$ 为warmup轮数，$w_{start}=0.01$，$w_{end}=0.1$。
+
+\section{冲突解决机制}
+\label{sec:collision_resolution_detail}
+
+\subsection{冲突检测与解决}
+\label{sec:collision_detection}
+
+当多个POI被量化到相同的Semantic ID时，需要附加后缀进行消歧。冲突解决算法如下：
+
+\begin{algorithm}[htbp]
+    \caption{SID冲突解决算法}
+    \label{alg:collision}
+    \begin{algorithmic}[1] % [1] 表示显示行号
+        \State $sid\_to\_pois \gets$ 按SID分组所有POI
+        \For{$sid$ \textbf{in} $sid\_to\_pois$}
+            \State $pois \gets sid\_to\_pois[sid]$
+            \If{$|pois| = 1$}
+                \State $resolved\_ids[pois[0]] \gets sid$
+            \Else \Comment{多个POI共享相同SID}
+                \For{$i \gets 0$ \textbf{to} $|pois|-1$}
+                    \State $resolved\_ids[pois[i]] \gets sid + \langle d_{i+1} \rangle$
+                \EndFor
+            \EndIf
+        \EndFor
+        \State \Return $resolved\_ids$
+    \end{algorithmic}
+\end{algorithm}
+
+\textbf{算法说明}：
+\begin{itemize}
+    \item 第1行：按Semantic ID对所有POI进行分组，得到 $\{SID \rightarrow [POI_1, POI_2, ...]\}$ 的映射结构
+    \item 第2-7行：遍历每一个SID分组
+    \item 第3行：获取当前SID分组下的所有POI列表
+    \item 第4-5行：若该SID仅对应一个POI，则无需消歧，直接使用原SID作为最终标识符
+    \item 第6-9行：若多个POI共享同一SID（发生冲突），则依次为每个POI附加顺序后缀 $\langle d_{i+1} \rangle$ 进行消歧
+    \item 第10行：返回所有POI的最终解析标识符字典
+\end{itemize}
+
+冲突后缀格式为 $\langle d_{xx} \rangle$，与前三层码本保持一致的 $\langle X_{YY} \rangle$ 结构。
+
+\textbf{设计说明}：早期曾考虑将PlusCode地理邻里编码注入Prompt以消歧，但可能引入噪声，后续简化为 $\langle d_{xx} \rangle$ 格式存储。
+
+\subsection{冲突解决示例}
+\label{sec:collision_example}
+
+\begin{equation}
+\text{原始SID}: \langle a\_{12} \rangle \langle b\_{34} \rangle \langle c\_{56} \rangle
+\end{equation}
+\begin{equation}
+\text{冲突后}:
+\begin{cases}
+\langle a\_{12} \rangle \langle b\_{34} \rangle \langle c\_{56} \rangle \langle d\_1 \rangle & \text{第一个POI}\\
+\langle a\_{12} \rangle \langle b\_{34} \rangle \langle c\_{56} \rangle \langle d\_2 \rangle & \text{第二个POI}
+\end{cases}
+\end{equation}
+
+\section{语义ID分布质量分析}
+\label{sec:sid_quality}
+
+\subsection{核心指标体系}
+\label{sec:sid_metrics}
+
+语义ID分布质量评估指标如表所示：
+
+\begin{table}[htbp]
+\centering
+\caption{语义ID分布分析指标}
+\label{tab:sid_metrics}
+\begin{tabular}{lll}
+\toprule
+指标 & 说明 & 计算方法 \\
+\midrule
+覆盖率 (Coverage) & 唯一SID数/总POI数 & $n_{prefixes} / n_{total}$ \\
+冲突率 (Collision Rate) & 发生ID冲突的POI比例 & 同SID的POI数 $>$ 1 \\
+后缀使用率 & 需要附加后缀的POI比例 & $n_{disambig} / n_{total}$ \\
+前缀分布熵 & 衡量prefix分布均匀程度 & $H = -\sum p_i \log(p_i)$ \\
+Gini系数 & 衡量分布不均匀程度 & $G = \frac{2\sum ic_i}{n\sum c_i} - \frac{n+1}{n}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Philadelphia数据集实验结果}
+\label{sec:philly_results}
+
+在Philadelphia城市子集（11,711个POI）上的语义ID分布质量统计结果如表所示：
+
+\begin{table}[htbp]
+\centering
+\caption{Philadelphia数据集语义ID分布统计}
+\label{tab:philly_sid_stats}
+\begin{tabular}{llr}
+\toprule
+指标 & 数值 & 说明 \\
+\midrule
+总POI数 & 11,711 & - \\
+唯一SID数 & 7,432 & 覆盖率 63.5\% \\
+冲突tuple数 & 1,702 & 有多个POI共享相同SID的SID数量 \\
+冲突POI数 & 4,279 & 冲突tuple中涉及的所有POI数量 \\
+需消歧后缀POI数 & 4,279 & 所有冲突POI均需附加 $\langle d_{xx} \rangle$ 后缀消歧 \\
+前缀分布熵 & 4.71 / 4.85 & 归一化熵 0.971（高度均匀）\\
+Gini系数 & 0.291 & 接近均匀分布 \\
+\midrule
+\end{tabular}
+\end{table}
+
+\textbf{冲突规模分布}：2 POIs/tuple有1,187个，3 POIs/tuple有319个，4 POIs/tuple有114个，5 POIs/tuple有45个，6 POIs/tuple有18个，其余规模共28个tuple；最大冲突为16个POI共享同一SID。
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/PA_main_city_collision_distribution.png}
+    \caption{冲突分布}
+    \label{fig:placeholder}
+\end{figure}
+\textbf{说明}：上图展示了冲突规模的分布情况，大多数冲突仅为2个ID。
+
+\subsection{码本利用率分析}
+\label{sec:codebook_usage}
+
+在Philadelphia数据集上，三层量化码本的实际利用情况：
+
+\begin{table}[htbp]
+\centering
+\caption{码本利用率统计}
+\label{tab:codebook_utilization}
+\begin{tabular}{cccc}
+\toprule
+量化层 & 活跃码字数 & 码本大小 & 利用率 \\
+\midrule
+P1 & 128 & 128 & 100.0\% \\
+P2 & 128 & 128 & 100.0\% \\
+P3 & 125 & 128 & 97.7\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+各层码字使用较为均衡，平均每个码字承载约91\~{}94个POI，表明码本设计合理。
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.0\linewidth]{figures/PA_main_city_codebook_heatmap_combined.png}
+    \caption{码本热力图}
+    \label{fig:placeholder}
+\end{figure}
+\textbf{说明}：上图展示了各层码字使用分布热力图:
+    \begin{enumerate}
+        \item 三层分布高度一致：P1、P2、P3的热力图模式几乎相同，说明残差量化在各层稳定分摊
+        \item 码本利用充分：几乎所有128个码字都在使用（颜色遍布全图）
+        \item 分布均匀：数值大多从约42到246，差异约6倍，无严重聚集
+        \item P1、P2基本无明显热点：没有某个区域特别深色，说明POI在语义空间中分布均衡
+    \end{enumerate}
+
+\textbf{死码重置机制}：使用率低于平均值10\%的码字被标记为死码，用随机样本重置。实验中P3层有3个未使用码字（2.3\%）。
+
+\section{本章小结}
+\label{sec:chapter3_summary}
+
+本章详细介绍了基于RQ-VAE的语义ID生成与冲突解决机制。主要内容包括：
+
+\begin{enumerate}
+    \item \textbf{多源特征编码器}：融合类别嵌入（64维）、3D球面坐标（3维）、Fourier时间特征（12维）等多种特征，总维度79维或143维。
+    \item \textbf{RQ-VAE语义ID生成框架}：通过Encoder将多维特征映射到64维语义空间，然后通过三层残差量化生成离散的Semantic ID。
+    \item \textbf{三层量化流程}：P1层捕获宏观特征，P2层细化到城市级别，P3层编码细粒度差异，各层独立码本。
+    \item \textbf{损失函数与训练策略}：采用重构损失、对齐损失、量化损失和动态调整的多样性损失联合优化。
+    \item \textbf{冲突解决机制}：对共享相同SID的POI附加顺序索引后缀 $\langle d_{xx} \rangle$ 进行消歧。
+    \item \textbf{语义ID分布质量分析}：建立覆盖率、冲突率、信息熵、Gini系数等评估指标体系。
+\end{enumerate}

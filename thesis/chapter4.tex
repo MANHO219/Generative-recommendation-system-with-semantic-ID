@@ -1,0 +1,389 @@
+\chapter{基于QLoRA-LLM的POI序列推荐}
+\label{chap:qlora_llm}
+
+\section{指令微调数据构建}
+\label{sec:instruction_data}
+
+\subsection{Prompt模板设计}
+\label{sec:prompt_template}
+
+本系统采用SID+时间历史的Prompt格式，将用户历史访问序列编码为自然语言提示。
+
+\noindent\textbf{系统Prompt：}\fcolorbox{black}{hlbg_b}{%
+\parbox{0.88\textwidth}{%
+\small
+"You are a POI next-visit prediction assistant. Predict only the next POI Semantic ID based on historical visit SIDs and timestamps. Output only one Semantic ID in angle-bracket format, such as <a\_12><b\_34><c\_56> or <a\_12><b\_34><c\_56><d\_1>."%
+}}
+
+\vspace{0.5ex}
+
+\noindent\textbf{用户输入模板：}\fcolorbox{black}{hlbg_g}{%
+\parbox{0.88\textwidth}{%
+\small
+"User\_\{user\_id\} checkin history: \{time1\} visited \{sid1\}, \{time2\} visited \{sid2\}, ... When \{target\_time\} user\_\{user\_id\} is likely to visit:"%
+}}
+
+该模板将用户历史访问序列（时间戳+Semantic ID）作为上下文，要求模型预测下一时刻可能访问的POI。
+
+\subsection{训练数据生成流程}
+\label{sec:data_generation}
+
+训练数据构建流程如下：
+
+\begin{algorithm}[htbp]
+\caption{指令微调数据构建}
+\label{alg:data_build}
+\begin{algorithmic}[1]
+\State 加载 Yelp 用户历史数据（reviews）和 POI 元数据
+\State 加载预生成的 Semantic ID 映射
+\For{\textbf{each} 用户 $u$}
+    \State 按时间排序该用户的所有签到记录
+    \State 构建访问序列 $visits = [(poi_1, t_1), (poi_2, t_2), \dots]$
+    \For{$i \gets 1$ to $|visits|-1$}
+        \State $history \gets visits[0:i]$  \Comment{取前$i$条作为历史}
+        \State $target \gets visits[i]$  \Comment{第$i+1$条作为目标}
+        \State 生成样本：$\{user\_id, history, target, target\_sid\}$
+    \EndFor
+\EndFor
+\State 按 80\%/10\%/10\% 划分训练/验证/测试集
+\end{algorithmic}
+\end{algorithm}
+
+数据格式化为对话格式：
+
+\begin{equation}
+\text{messages} = \left[
+    \left(\text{"system"}, \mathbf{p}_{sys}\right),
+    \left(\text{"user"}, \mathbf{p}_{user}(user\_id, history)\right),
+    \left(\text{"assistant"}, sid_{target}\right)
+\right]
+\label{eq:chat_format}
+\end{equation}
+
+其中 $\mathbf{p}_{sys}$ 为系统提示，$\mathbf{p}_{user}$ 为用户输入模板，$sid_{target}$ 为目标Semantic ID。
+
+\section{QLoRA微调策略}
+\label{sec:qlora_config}
+
+\subsection{量化配置}
+\label{sec:quantization_config}
+
+使用4bit NF4量化，配置参数如下：
+
+\begin{itemize}
+    \item \textbf{load\_in\_4bit}：启用4bit量化
+    \item \textbf{bnb\_4bit\_quant\_type}：\verb|"nf4"|（NormalFloat4）
+    \item \textbf{bnb\_4bit\_compute\_dtype}：\verb|bfloat16|
+    \item \textbf{bnb\_4bit\_use\_double\_quant}：启用双重量化，进一步压缩
+\end{itemize}
+
+\textbf{图示}：\figurename~\ref{fig:qlora_quant}（待补充）
+
+4bit量化显著减少显存占用，使得大模型微调可在消费级GPU上完成。
+
+\subsection{LoRA配置}
+\label{sec:lora_config}
+
+LoRA微调的主要参数：
+
+\begin{table}[htbp]
+\centering
+\caption{LoRA配置参数}
+\label{tab:lora_config}
+\begin{tabular}{ll}
+\toprule
+参数 & 默认值 \\
+\midrule
+r (秩) & 16 \\
+lora\_alpha & 32 \\
+target\_modules & q\_proj, k\_proj, v\_proj, o\_proj, \\
+                 & gate\_proj, up\_proj, down\_proj \\
+lora\_dropout & 0.05 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+LoRA通过在原模型权重旁添加低秩分解矩阵，仅训练这些新增参数，大幅降低微调成本。
+
+\subsection{训练超参数}
+\label{sec:training_params}
+
+\begin{table}[htbp]
+\centering
+\caption{训练超参数}
+\label{tab:training_params}
+\begin{tabular}{ll}
+\toprule
+参数 & 默认值 \\
+\midrule
+max\_seq\_length & 704 \\
+per\_device\_train\_batch\_size & 6 \\
+gradient\_accumulation\_steps & 3 \\
+learning\_rate & 2e-5 \\
+num\_train\_epochs & 3 \\
+warmup\_steps & 100 \\
+bf16 & True \\
+optim & paged\_adamw\_32bit \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+有效batch size为 $6 \times 3 = 18$。
+
+\section{Trie约束解码}
+\label{sec:trie_decoding}
+
+\subsection{TokenTrie数据结构}
+\label{sec:trie_structure}
+
+Trie树用于存储所有合法的Semantic ID序列，确保生成的ID对应真实存在的POI：
+
+\textbf{图示}：\figurename~\ref{fig:trie_structure}（待补充）
+
+\textbf{Trie节点结构}：
+\begin{itemize}
+    \item \textbf{children}：子节点映射，$\mathcal{C} = \{ (t_i \rightarrow node_i) \}$
+    \item \textbf{is\_end}：是否为完整的Semantic ID终点
+\end{itemize}
+
+\textbf{核心操作}：
+\begin{itemize}
+    \item \textbf{add}$(\mathbf{t})$：将token序列 $\mathbf{t} = [t_1, t_2, \dots]$ 添加到Trie
+    \item \textbf{traverse}$(\mathbf{t})$：沿token序列遍历Trie，返回当前节点
+    \item \textbf{next\_tokens}$(\mathbf{t})$：返回当前前缀允许的下一个token集合 $\mathcal{N} \subset \mathcal{V}$
+\end{itemize}
+
+\subsection{TrieConstrainedLogitsProcessor}
+\label{sec:trie_processor}
+
+约束解码逻辑：
+
+\begin{algorithm}[htbp]
+\caption{Trie约束解码算法}
+\label{alg:trie_decode}
+\begin{algorithmic}[1]
+\For{\textbf{each} $batch\_idx$} \Comment{遍历批次中的样本}
+    \State $generated \gets input\_ids[prefix\_length:]$ \Comment{获取当前已生成的序列}
+    \State $node \gets trie.traverse(generated)$
+    \If{$node$ \textbf{is} None}
+        \State $allowed \gets [EOS\_token\_id]$ \Comment{无效前缀，强制结束}
+    \Else
+        \State $allowed \gets node.children.keys()$ \Comment{获取Trie树下一层合法token}
+        \If{$node.is\_end$ \textbf{and} $allow\_early\_stop$}
+            \State $allowed.append(EOS\_token\_id)$
+        \EndIf
+    \EndIf
+    \State $scores \gets mask\_disallowed(scores, allowed)$ \Comment{对非法token进行概率屏蔽}
+\EndFor
+\State \Return $scores$
+\end{algorithmic}
+\end{algorithm}
+
+该机制确保：
+\begin{enumerate}
+    \item 生成的token序列始终是合法的Semantic ID前缀
+    \item 若遍历失败（无效前缀），强制结束生成
+    \item 支持early stop，当完整SID生成后允许EOS
+\end{enumerate}
+
+\section{实验设置}
+\label{sec:experiment_setup}
+
+\subsection{数据集}
+\label{sec:dataset}
+
+实验使用Yelp数据集的Philadelphia城市子集，该子集包含约14,569个POI和大量用户签到记录。
+
+\begin{table}[htbp]
+\centering
+\caption{数据集统计}
+\label{tab:dataset_stats}
+\begin{tabular}{lr}
+\toprule
+项目 & 数值 \\
+\midrule
+POI数量 & 14,569 \\
+用户数量 & ~10,000+ \\
+签到记录数 & 100,000+ \\
+\midrule
+训练集比例 & 80\% \\
+验证集比例 & 10\% \\
+测试集比例 & 10\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{数据划分}：按时间顺序切分，确保测试集用户的历史完全包含在训练集中。
+
+\subsection{评估指标}
+\label{sec:eval_metrics}
+
+采用以下评估指标：
+
+\begin{table}[htbp]
+\centering
+\caption{推荐评估指标}
+\label{tab:eval_metrics}
+\begin{tabular}{lll}
+\toprule
+指标 & 说明 & 计算方法 \\
+\midrule
+HR@K & K次推荐中包含真实POI的比例 & $Hit@K / N_{total}$ \\
+MRR@K & Mean Reciprocal Rank & $\frac{1}{K}\sum_{i=1}^{K}\frac{1}{rank_i}$ \\
+NDCG@K & 归一化折现增益 & $DCG@K / IDCG@K$ \\
+valid\_sid\_rate & 生成合法SID的比例 & $N_{valid} / N_{total}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+其中 $rank_i$ 为第 $i$ 个真实SID在Top-K预测中的位置。
+
+\subsection{Baseline方法}
+\label{sec:baseline_methods}
+
+对比实验采用以下基线方法：
+
+\begin{itemize}
+    \item \textbf{FPMC}：因子分解个性化马尔可夫链，RecSys 2010
+    \item \textbf{STAN}：时空注意力网络，WWW 2021
+    \item \textbf{SARS}：序列感知推荐系统，RecSys 2020
+\end{itemize}
+
+\section{推荐效果对比实验}
+\label{sec:recommendation_comparison}
+
+\subsection{HR@K性能对比}
+\label{sec:hrk_comparison}
+
+\begin{table}[htbp]
+\centering
+\caption{HR@K性能对比}
+\label{tab:hrk_comparison}
+\begin{tabular}{lccc}
+\toprule
+方法 & HR@1 & HR@5 & HR@10 \\
+\midrule
+FPMC & - & - & - \\
+STAN & - & - & - \\
+SARS & - & - & - \\
+\textbf{本文方法} & - & - & - \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{MRR@K性能对比}
+\label{sec:mrrk_comparison}
+
+\begin{table}[htbp]
+\centering
+\caption{MRR@K性能对比}
+\label{tab:mrrk_comparison}
+\begin{tabular}{lccc}
+\toprule
+方法 & MRR@1 & MRR@5 & MRR@10 \\
+\midrule
+FPMC & - & - & - \\
+STAN & - & - & - \\
+SARS & - & - & - \\
+\textbf{本文方法} & - & - & - \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{NDCG@K性能对比}
+\label{sec:ndcgk_comparison}
+
+\begin{table}[htbp]
+\centering
+\caption{NDCG@K性能对比}
+\label{tab:ndcgk_comparison}
+\begin{tabular}{lccc}
+\toprule
+方法 & NDCG@1 & NDCG@5 & NDCG@10 \\
+\midrule
+FPMC & - & - & - \\
+STAN & - & - & - \\
+SARS & - & - & - \\
+\textbf{本文方法} & - & - & - \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{消融实验}
+\label{sec:ablation}
+
+\subsection{冲突解决机制的作用}
+\label{sec:collision_ablation}
+
+\begin{table}[htbp]
+\centering
+\caption{冲突解决机制消融实验}
+\label{tab:collision_ablation}
+\begin{tabular}{lccc}
+\toprule
+配置 & HR@5 & MRR@5 & NDCG@5 \\
+\midrule
+无冲突解决 & - & - & - \\
+有冲突解决 & - & - & - \\
+\midrule
+\textbf{提升} & - & - & - \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{分析}：冲突解决后缀 $\langle d_{xx} \rangle$ 使得具有相同基础SID的POI能够被区分，有效提升推荐准确性。
+
+\subsection{Trie约束解码的作用}
+\label{sec:trie_ablation}
+
+\begin{table}[htbp]
+\centering
+\caption{Trie约束解码消融实验}
+\label{tab:trie_ablation}
+\begin{tabular}{lccc}
+\toprule
+配置 & Valid SID Rate & HR@5 & 生成延迟 \\
+\midrule
+无约束解码 & - & - & - \\
+有约束解码 & - & - & - \\
+\midrule
+\textbf{提升} & - & - & - \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{分析}：Trie约束解码确保生成的Semantic ID对应真实存在的POI，有效避免无意义输出。
+
+\section{生成式评测指标}
+\label{sec:generation_metrics}
+
+\begin{table}[htbp]
+\centering
+\caption{生成式评测指标}
+\label{tab:gen_metrics}
+\begin{tabular}{ll}
+\toprule
+指标 & 说明 \\
+\midrule
+exact\_match & Top-1与真实SID完全匹配的比例 \\
+hit@K & 真实SID出现在Top-K的比例 \\
+MRR@K & Mean Reciprocal Rank \\
+valid\_sid\_rate & 生成的SID是合法POI的比例 \\
+avg\_latency\_ms & 平均生成延迟（毫秒） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{本章小结}
+\label{sec:chapter4_summary}
+
+本章介绍了基于QLoRA-LLM的POI序列推荐系统。主要内容包括：
+
+\begin{enumerate}
+    \item \textbf{指令微调数据构建}：设计SID+时间历史的Prompt模板，将用户历史访问序列编码为自然语言提示。
+    \item \textbf{QLoRA微调策略}：采用4bit NF4量化和LoRA（r=16）微调Qwen3-8B-Instruct模型。
+    \item \textbf{Trie约束解码}：通过Trie数据结构约束解码过程，确保生成的Semantic ID合法有效。
+    \item \textbf{实验设置}：在Yelp Philadelphia数据集上进行实验，采用HR@K、MRR@K、NDCG@K等指标评估。
+    \item \textbf{推荐效果对比}：与FPMC、STAN、SARS等基线方法进行对比。
+    \item \textbf{消融实验}：验证冲突解决机制和Trie约束解码的有效性。
+\end{enumerate}

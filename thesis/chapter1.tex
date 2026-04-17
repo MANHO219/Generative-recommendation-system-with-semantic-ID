@@ -1,0 +1,141 @@
+\chapter{绪论}
+\label{chap:intro}
+
+\section{选题背景与意义}
+\label{sec:background}
+
+随着移动互联网的快速发展和智能终端的普及，基于位置的服务（Location-Based Service, LBS）已成为人们日常生活中不可或缺的一部分。\textbf{兴趣点推荐（Point-of-Interest, POI推荐）}是LBS的核心技术之一，旨在根据用户的历史行为和偏好，预测用户下一步可能访问的地点，并向用户推荐感兴趣的POI。POI推荐在大众点评推荐、地图导航、社交网络好友推荐等场景中具有广泛的应用价值。
+
+与传统的商品推荐不同，POI推荐面临三个独特的挑战：
+
+\begin{enumerate}
+    \item \textbf{地理空间约束}：用户的移动行为受到地理空间的严格限制，偏好访问距离较近的POI，且地理位置呈现明显的距离衰减特性。
+    \item \textbf{时空序列依赖}：用户的访问行为具有强烈的序列相关性，既受短期序列模式影响（如``午餐后去咖啡厅''），也受长期周期性影响（如``每周一上午去健身房''）。
+    \item \textbf{数据稀疏性问题}：相比于用户访问的POI数量，未访问的POI数量呈指数级增长，导致正样本严重不足。
+\end{enumerate}
+
+传统的协同过滤方法通过挖掘用户-POI交互矩阵中的相似性进行推荐，但难以有效建模用户行为的时空序列特性。近年来，深度学习技术在POI推荐领域取得了显著进展。\textbf{循环神经网络（RNN）}能够捕捉用户签到序列中的时序依赖，但难以建模非连续位置之间的远程时空关联。\textbf{注意力机制}的出现使得模型能够直接建立序列中任意两个位置之间的关联，但现有方法仍然依赖于物品ID的离散嵌入表示，存在冷启动和泛化能力不足的问题。
+
+\textbf{大语言模型（Large Language Model, LLM）}的崛起为推荐系统带来了新的机遇。LLM具备强大的语义理解和推理能力，能够理解用户行为的语义意图，将推荐任务建模为自然语言理解与生成任务。然而，将LLM直接应用于POI推荐面临严峻挑战：LLM的输入为自然语言token序列，而POI的表示是离散的整数ID，缺乏语义信息。如何将LLM的强大能力与POI推荐的独特问题相结合，成为当前研究的重要方向。
+
+\textbf{语义标识符（Semantic Identifier, Semantic ID）}技术提供了一种潜在的解决方案。Semantic ID通过深度学习模型将POI的文本属性（如类别、名称、描述）和地理属性编码为连续的语义向量，再量化为离散的token序列。与随机分配的整数ID不同，Semantic ID具有语义相关性——语义相近的POI在ID空间中也相近。这使得Semantic ID能够：
+\begin{itemize}
+    \item 缓解冷启动问题：新POI只要有文本描述即可获得有意义的ID表示
+    \item 支持序列建模：量化的token序列可直接用于自回归语言模型
+    \item 融合多模态信息：可同时编码文本、地理等多模态属性
+\end{itemize}
+
+基于上述背景，本研究提出一套基于\textbf{残差量化变分自编码器（RQ-VAE）}的Semantic ID生成系统，并结合\textbf{QLoRA微调的大语言模型}进行POI序列推荐。通过RQ-VAE将POI的多维特征（类别、地理位置、时间、属性文本）编码为三层语义ID，并针对语义ID冲突问题设计了冲突解决策略。在此基础上，使用Trie约束解码确保生成语义ID的合法性和有效性。
+
+\section{国内外研究现状和相关工作}
+\label{sec:related}
+
+\subsection{传统POI推荐方法}
+\label{sec:traditional_poi}
+
+早期的POI推荐方法主要基于协同过滤（Collaborative Filtering, CF）。协同过滤通过挖掘用户行为数据中的相似性进行推荐，包括基于用户的协同过滤和基于物品的协同过滤。然而，协同过滤方法难以有效建模用户行为的时空序列特性，在稀疏数据集上表现不佳。
+
+\textbf{因子分解个性化马尔可夫链（Factorizing Personalized Markov Chains, FPMC）}\cite{rendle2010fpmc}由Rendle等人于2010年提出，首次将矩阵分解与马尔可夫链统一到同一框架中。FPMC的预测公式为：
+
+\begin{equation}
+\hat{r}_{u,i} = \mathbf{p}_u^\top \mathbf{q}_i + \sum_{j \in S_{u}^{t-1}} \mathbf{x}_j^\top \mathbf{y}_i
+\label{eq:fpmc}
+\end{equation}
+
+其中第一项建模用户的静态偏好（矩阵分解部分），第二项建模用户行为的序列转移（马尔可夫链部分）。FPMC能够同时捕捉用户的长期偏好和短期序列模式，但其存在两点局限：（1）马尔可夫链假设下一个POI仅与前$k$个POI相关，难以建模长程依赖；（2）基于矩阵分解的隐向量表示缺乏语义信息，无法处理新用户或新物品的冷启动问题。
+
+\subsection{基于深度学习的POI推荐方法}
+\label{sec:deep_poi}
+
+\textbf{时空循环神经网络（Spatial Temporal Recurrent Neural Networks, ST-RNN）}\cite{liu2016predicting}由Liu等人于2016年提出，在RNN的隐状态转换中引入时间和空间距离矩阵，能够在一定程度上捕捉用户行为的时空模式。ST-RNN仍面临两个关键局限：（1）基于RNN的序列建模难以有效捕捉非连续位置之间的远程时空关联；（2）简单的距离矩阵无法表达复杂的时空交互模式。
+
+\textbf{DeepMove}\cite{feng2018predicting}（Feng et al., WWW 2018）针对长期周期性问题进行了改进。DeepMove设计了历史注意力机制，能够从用户过去数周乃至数月的长期历史轨迹中，通过注意力机制检索与当前上下文最相关的行为模式。这一工作标志着POI推荐研究开始关注长程依赖和周期性问题。
+
+\textbf{时空注意力网络（Spatial-Temporal Attention Network, STAN）}\cite{luo2021stan}（Luo et al., WWW 2021）放弃了RNN架构，采用纯注意力机制（Self-Attention）直接建模轨迹中任意两点之间的时空关联。STAN的核心创新在于：（1）通过多模态注意力显式计算任意两点之间的时空距离（基于经纬度的哈弗辛距离和时间差）；（2）考虑了空间上的``三角不等式''约束。
+
+STAN代表了基于深度学习的POI推荐在当时的最优效果，但其仍然依赖于离散ID的嵌入表示，存在语义信息缺失和冷启动问题。
+
+\subsection{基于图神经网络的POI推荐方法}
+\label{sec:gnn_poi}
+
+\textbf{图神经网络（Graph Neural Network, GNN）}能够自然地建模用户-POI交互数据和POI之间的地理关系。该方向的代表性工作将用户-POI交互和POI地理邻近关系联合建模到异构图上，通过图神经网络进行信息传播和聚合。融合地理信息的图神经网络能够有效提升POI推荐的准确性，但仍存在以下局限：（1）依赖于交互数据中的拓扑结构，对新POI的地理信息利用不充分；（2）图神经网络的消息传递机制难以捕捉用户行为的高阶序列模式；（3）同样面临ID语义缺失问题。
+
+\subsection{基于自监督学习的序列化推荐方法}
+\label{sec:ssl_rec}
+
+自监督学习通过在无标注数据上设计辅助任务来增强序列表示，已被广泛应用于序列化推荐。\textbf{S³-Rec}\cite{zhou2020s3rec}（Zhou et al., CIKM 2020）采用掩码语言模型（Masked Language Modeling, MLM）目标进行自监督预训练，通过多视角对比增强序列表示。S³-Rec在多个公开数据集上取得了当时最优效果，证明了自监督预训练对序列化推荐的有效性。然而，S³-Rec同样依赖于物品ID的离散嵌入，无法解决冷启动和语义泛化问题。
+
+\subsection{基于大语言模型的推荐方法}
+\label{sec:llm_rec}
+
+近年来，\textbf{大语言模型（LLM）}在推荐系统领域展现出巨大潜力。LLM凭借其强大的语义理解、推理和生成能力，能够实现多轮对话式推荐、推荐解释生成、跨域知识迁移等任务。
+
+\textbf{生成式检索推荐}\cite{rajput2023recommender}（Rajput et al., NeurIPS 2023）探索了使用生成式模型进行推荐的范式，通过将物品编码为离散token序列，实现了端到端的生成式检索。该工作首次提出Semantic ID技术，证明了将推荐任务建模为序列生成问题的可行性。
+
+然而，将LLM直接应用于POI推荐面临以下挑战：（1）LLM的输入为自然语言token序列，而POI表示为离散整数ID，缺乏语义信息和连续性；（2）POI的地理坐标等数值特征难以直接用自然语言描述；（3）现有的POI推荐数据集规模难以满足LLM微调的需求。
+
+\subsection{语义标识符技术}
+\label{sec:semantic_id}
+
+\textbf{Semantic ID}技术由Rajput等人在NeurIPS 2023的``Recommender Systems with Generative Retrieval''论文中首次提出。该技术通过深度学习模型将物品映射到语义向量空间，再量化为离散的token序列。与随机整数ID不同，Semantic ID具有语义相关性——语义相近的物品在ID空间中也相近。
+
+该工作的核心贡献包括：（1）将物品编码为离散的token序列，实现端到端的生成式检索；（2）Semantic ID的语义相关性使得模型具备良好的泛化能力，能够处理新物品的冷启动问题；（3）为推荐系统与语言模型的结合提供了新的思路。
+
+然而，现有的Semantic ID研究在以下方面存在不足：（1）主要关注商品推荐场景，对POI推荐的独特挑战（如地理空间约束）关注不足；（2）量化方法较为简单，未能充分利用多模态特征；（3）缺乏对语义ID分布质量和冲突率的系统分析。
+
+\section{研究空白与问题定义}
+\label{sec:gap}
+
+综合上述分析，现有POI推荐方法存在以下研究空白：
+
+\begin{enumerate}
+    \item \textbf{LLM与POI推荐的结合问题}：如何将LLM的强大语义理解能力与POI推荐的独特挑战（地理空间约束、时空序列依赖）有效结合，仍是一个开放问题。
+    \item \textbf{Semantic ID在POI场景的适用性}：现有Semantic ID研究主要针对商品推荐场景，对POI推荐的独特挑战（如地理空间约束）关注不足，特别是地理空间特征如何融入语义编码尚未充分探索。
+    \item \textbf{语义ID分布质量评估}：现有研究缺乏对Semantic ID分布的系统评估指标体系，包括冲突率、覆盖率、分布均匀性等方面的定量分析。
+    \item \textbf{语义ID约束解码问题}：当使用LLM生成Semantic ID时，如何确保生成的ID是合法有效的（对应真实存在的POI），需要有效的约束解码机制。
+\end{enumerate}
+
+针对上述研究空白，本文提出一套基于Semantic ID和LLM的POI序列推荐系统。
+
+\section{本文主要研究内容}
+\label{sec:content}
+
+本文的主要研究内容包括以下几个方面：
+
+\begin{enumerate}
+    \item \textbf{基于RQ-VAE的语义ID生成框架}：采用残差量化变分自编码器将POI的多维特征编码为三层语义ID，融合类别嵌入、地理坐标、Fourier时间特征和属性文本嵌入。
+    \item \textbf{基于顺序索引的冲突解决机制}：对冲突的语义ID附加顺序索引后缀进行消歧，与前三层码本保持一致的格式。
+    \item \textbf{语义ID分布质量分析}：建立覆盖率、冲突率、信息熵、Gini系数等指标，为语义ID生成质量提供定量评估依据。
+    \item \textbf{基于QLoRA微调的LLM序列推荐}：使用QLoRA技术对Qwen3-8B-Instruct大语言模型进行指令微调，实现POI序列推荐。
+    \item \textbf{基于Trie的约束解码}：设计基于Trie数据结构的约束解码机制，确保LLM生成的语义ID合法有效。
+\end{enumerate}
+
+\section{本文的主要贡献}
+\label{sec:contribution}
+
+本文的主要贡献可以概括为以下几点：
+
+\begin{enumerate}
+    \item \textbf{提出基于RQ-VAE的语义ID生成框架}：融合类别、地理、时间、属性文本等多维特征，通过残差量化生成具有语义相关性的三层POI标识符。
+    \item \textbf{设计基于顺序索引的冲突解决机制}：对冲突的语义ID附加顺序索引后缀进行消歧，提升语义ID的覆盖率和区分度。
+    \item \textbf{建立语义ID分布质量评估指标体系}：提出覆盖率、冲突率、信息熵、Gini系数等指标，为语义ID生成质量提供定量评估依据。
+    \item \textbf{构建基于QLoRA-LLM的POI序列推荐系统}：将语义ID与大语言模型结合，配合Trie约束解码，实现可解释的POI序列推荐。
+    \item \textbf{在Yelp真实数据集上进行实验验证}：在Philadelphia城市子集上进行实验，验证所提方法的有效性。
+\end{enumerate}
+
+\section{论文结构}
+\label{sec:structure}
+
+本文共分为六章，各章内容安排如下：
+
+\textbf{第一章 绪论}：介绍POI推荐的背景与意义，分析国内外研究现状，指出研究空白，阐述本文的主要研究内容和贡献。
+
+\textbf{第二章 问题定义和代表性方法}：给出POI推荐和语义ID的形式化定义，介绍RQ-VAE残差量化、QLoRA微调等代表性方法的技术细节。
+
+\textbf{第三章 基于RQ-VAE的语义ID生成与冲突解决}：详细阐述语义ID生成框架、冲突检测与解决算法，以及语义ID分布质量分析指标。
+
+\textbf{第四章 基于QLoRA-LLM的POI序列推荐}：介绍指令微调数据的构建方法、QLoRA微调策略和Trie约束解码机制。
+
+\textbf{第五章 实验与分析}：在Yelp数据集上进行实验，与基线方法进行对比，进行消融实验分析，验证所提方法的有效性。
+
+\textbf{第六章 总结与展望}：总结本文的研究工作和主要贡献，并展望未来的研究方向。

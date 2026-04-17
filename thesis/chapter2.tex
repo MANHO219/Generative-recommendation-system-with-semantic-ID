@@ -1,0 +1,352 @@
+\chapter{问题定义和代表性方法}
+\label{chap:problem}
+
+\section{POI推荐问题定义}
+\label{sec:poi_problem}
+
+\subsection{用户-POI交互序列}
+\label{sec:user_poi_sequence}
+
+给定用户 $u$ 的历史签到序列：
+
+\begin{equation}
+S_u = [(poi_1, t_1), (poi_2, t_2), \dots, (poi_n, t_n)]
+\label{eq:user_sequence}
+\end{equation}
+
+其中 $S_u$ 表示用户 $u$ 的历史交互序列，$poi_i$ 为第 $i$ 次交互的POI，$t_i$ 为对应的时间戳。
+
+\subsection{Next-POI预测任务}
+\label{sec:next_poi_task}
+
+基于用户历史序列和上下文信息，预测用户下一个可能访问的POI：
+
+\begin{equation}
+poi_{n+1} = \arg\max_{poi \in \mathcal{P}} P(poi \mid S_u, context)
+\label{eq:next_poi}
+\end{equation}
+
+其中 $\mathcal{P}$ 为所有POI的集合，$context$ 包含时空上下文信息。
+
+\section{语义ID的定义与表示}
+\label{sec:sid_definition}
+
+\subsection{Semantic ID格式}
+\label{sec:sid_format}
+
+本文采用三层量化结构生成POI的语义标识符：
+
+\begin{equation}
+SID(poi) = \langle a_{p1} \rangle \langle b_{p2} \rangle \langle c_{p3} \rangle
+\label{eq:sid_format}
+\end{equation}
+
+例如：$\langle a_{12} \rangle \langle b_{34} \rangle \langle c_{56} \rangle$
+
+其中 $\langle a_X \rangle$、$\langle b_X \rangle$、$\langle c_X \rangle$ 分别对应P1、P2、P3三层量化索引。
+
+\subsection{冲突解决后缀}
+\label{sec:collision_resolution}
+
+当多个POI被量化到相同的Semantic ID时，需要附加后缀进行消歧：
+
+\begin{equation}
+\text{原始SID}: \langle a\_{12} \rangle \langle b\_{34} \rangle \langle c\_{56} \rangle
+\end{equation}
+\begin{equation}
+\text{冲突后}: \langle a\_{12} \rangle \langle b\_{34} \rangle \langle c\_{56} \rangle \langle d\_1 \rangle
+\end{equation}
+
+其中 $\langle d_N \rangle$ 表示第 $N$ 个冲突POI的顺序索引。
+
+\textbf{设计说明}：早期曾考虑将PlusCode地理邻里编码注入Prompt以消歧，但可能引入噪声，后续简化为 $\langle d_{xx} \rangle$ 格式存储，与前三层码本保持一致的 $\langle X_{YY} \rangle$ 结构。
+
+\section{RQ-VAE残差量化变分自编码器}
+\label{sec:rqvae}
+
+\subsection{模型架构}
+\label{sec:rqvae_arch}
+
+RQ-VAE的核心架构如图所示：
+
+\begin{equation}
+\text{Input} \xrightarrow{} \text{Encoder} \xrightarrow{} \text{RQ} \xrightarrow{} \text{Decoder} \xrightarrow{} \text{Output}
+\end{equation}
+
+\begin{itemize}
+    \item \textbf{Encoder}：将输入特征映射到 embedding\_dim 维连续空间
+    \item \textbf{RQ}：残差量化器，将连续向量量化为离散索引
+    \item \textbf{Decoder}：从量化向量重构原始特征
+\end{itemize}
+
+\subsection{核心参数配置}
+\label{sec:rqvae_params}
+
+RQ-VAE的主要超参数如表所示：
+
+\begin{table}[htbp]
+\centering
+\caption{RQ-VAE核心参数配置}
+\label{tab:rqvae_params}
+\begin{tabular}{ll}
+\toprule
+参数 & 默认值 \\
+\midrule
+input\_dim & 79 \\
+embedding\_dim & 64 \\
+num\_quantizers & 3 \\
+codebook\_size & 128 \\
+commitment\_cost & 0.25 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Encoder设计}
+\label{sec:encoder_design}
+
+简化Encoder采用单层线性变换：
+
+\begin{equation}
+\mathbf{h} = \text{LayerNorm}\left(\text{GELU}\left(\mathbf{W}_e \mathbf{x} + \mathbf{b}_e\right)\right)
+\end{equation}
+
+原始方案采用多层MLP结构：$[input\_dim, 512, 256, 128, embedding\_dim]$。
+
+\subsection{残差量化器}
+\label{sec:residual_quantizer}
+
+残差量化器的核心机制如算法所示：
+
+\begin{algorithm}[htbp]
+\caption{残差量化算法}
+\label{alg:rq}
+\begin{algorithmic}[1]
+\State $residual \leftarrow z$  \Comment 输入向量
+\State $quantized\_sum \leftarrow \mathbf{0}$
+\For{$i \leftarrow 1$ to $num\_quantizers$}
+    \State $quantized_i, indices_i, loss_i \leftarrow quantizer_i(residual)$
+    \State $quantized\_sum \leftarrow quantized\_sum + quantized_i$
+    \State $residual \leftarrow residual - quantized_i$
+\EndFor
+\State \Return $quantized\_sum, [indices_1, indices_2, indices_3]$
+\end{algorithmic}
+\end{algorithm}
+
+各层采用独立码本，码本大小为codebook\_size。
+
+\textbf{EMA更新机制}：使用指数移动平均更新码本向量，死码（使用率低于平均值10\%）用随机样本重置。
+
+\subsection{损失函数}
+\label{sec:rqvae_loss}
+
+总损失函数定义为：
+
+\begin{equation}
+\mathcal{L}_{total} = \mathcal{L}_{recon} + \mathcal{L}_{quant} + \mathcal{L}_{align} + \mathcal{L}_{diversity}
+\label{eq:rqvae_loss}
+\end{equation}
+
+其中：
+\begin{itemize}
+    \item $\mathcal{L}_{recon}$：重构损失，MSE(decoder\_output, input)
+    \item $\mathcal{L}_{quant}$：量化损失，commitment\_loss
+    \item $\mathcal{L}_{align}$：对齐损失，$1 - \cosine\_similarity(quantized, encoded)$
+    \item $\mathcal{L}_{diversity}$：码本均匀性损失（epoch $\geq$ 5后启用）
+\end{itemize}
+
+\section{QLoRA微调配置}
+\label{sec:qlora_config}
+
+\subsection{量化配置}
+\label{sec:quantization_config}
+
+使用4bit NF4量化，配置参数如下：
+\begin{itemize}
+    \item \textbf{load\_in\_4bit}：启用4bit量化
+    \item \textbf{bnb\_4bit\_quant\_type}：\verb|"nf4"|
+    \item \textbf{bnb\_4bit\_compute\_dtype}：\verb|float16|
+    \item \textbf{bnb\_4bit\_use\_double\_quant}：启用双重量化
+\end{itemize}
+
+\subsection{LoRA配置}
+\label{sec:lora_config}
+
+LoRA微调的主要参数：
+
+\begin{table}[htbp]
+\centering
+\caption{LoRA配置参数}
+\label{tab:lora_config}
+\begin{tabular}{ll}
+\toprule
+参数 & 默认值 \\
+\midrule
+r (秩) & 16 \\
+lora_alpha & 32 \\
+target_modules & q_proj, k_proj, v_proj, o_proj \\
+lora_dropout & 0.05 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{训练超参数}
+\label{sec:training_params}
+
+\begin{table}[htbp]
+\centering
+\caption{训练超参数}
+\label{tab:training_params}
+\begin{tabular}{ll}
+\toprule
+参数 & 默认值 \\
+\midrule
+max_seq_length & 512 \\
+per_device_train_batch_size & 2 \\
+gradient_accumulation_steps & 4 \\
+learning_rate & 2e-4 \\
+num_train_epochs & 3 \\
+warmup_steps & 100 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Trie约束解码}
+\label{sec:trie_decoding}
+
+\subsection{TokenTrie数据结构}
+\label{sec:trie_structure}
+
+Trie树用于存储所有合法的Semantic ID序列：
+
+\textbf{Trie节点结构}：
+\begin{itemize}
+    \item \textbf{children}：子节点映射，$\mathcal{C} = \{ (t_i \rightarrow node_i) \}$
+    \item \textbf{is\_end}：是否为完整Semantic ID的终点
+\end{itemize}
+
+\textbf{核心操作}：
+\begin{itemize}
+    \item \textbf{add}$(\mathbf{t})$：将token序列添加到Trie
+    \item \textbf{traverse}$(\mathbf{t})$：沿token序列遍历Trie
+    \item \textbf{next\_tokens}$(\mathbf{t})$：返回当前前缀允许的下一个token集合
+\end{itemize}
+
+\subsection{TrieConstrainedLogitsProcessor}
+\label{sec:trie_processor}
+
+约束解码逻辑：
+
+\begin{enumerate}
+    \item 获取已生成的token序列
+    \item 沿Trie遍历，获取当前节点
+    \item 若遍历失败（无效前缀），mask所有token，仅允许EOS
+    \item 若遍历成功，仅允许 node.children 中的token
+    \item 支持early stop（当node.is_end=True时允许EOS）
+\end{enumerate}
+
+\subsection{生成式评测指标}
+\label{sec:gen_metrics}
+
+\begin{table}[htbp]
+\centering
+\caption{生成式评测指标}
+\label{tab:gen_metrics}
+\begin{tabular}{ll}
+\toprule
+指标 & 说明 \\
+\midrule
+exact_match & Top-1与真实SID完全匹配的比例 \\
+hit@K & 真实SID出现在Top-K的比例 \\
+MRR@K & Mean Reciprocal Rank \\
+valid_sid_rate & 生成的SID是合法POI的比例 \\
+avg_latency_ms & 平均生成延迟（毫秒） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Prompt模板}
+\label{sec:prompt_template}
+
+\subsection{系统Prompt}
+\label{sec:system_prompt}
+\fcolorbox{black}{hlbg_b}{%
+\parbox{0.88\textwidth}{%
+\small
+"You are an intelligent POI (Point of Interest) recommendation assistant. Your task is to predict the next POI that a user will visit based on their profile, visit history, and current spatiotemporal context. Generate the Semantic ID in the format: <a\_p1><b\_p2><c\_p3> (e.g., <a\_12><b\_34><c\_56>)."%
+}}
+
+\vspace{0.5ex}
+
+\subsection{用户输入模板}
+\label{sec:user_prompt}
+\fcolorbox{black}{hlbg_g}{%
+\parbox{0.88\textwidth}{%
+\small
+"\textbf{User Profile:} User ID: \{user\_id\}, Active Level: \{review\_count\} reviews, Average Rating: \{average\_stars\} stars, Favorite Categories: \{favorite\_categories\} \\
+\textbf{Spatiotemporal Context:} Current Location: Plus Code \{pluscode\}, Time: \{time\_description\}, Day Type: \{day\_type\} \\
+\textbf{Visit History (Recent \{count\} visits):} \{history\_items\} \\
+Based on the above information, predict the Semantic ID of the next POI the user will visit. Output only the Semantic ID in format: <a\_XX><b\_XX><c\_XX>."%
+}}
+
+\section{数据划分策略}
+\label{sec:data_split}
+
+\subsection{Yelp数据集城市分布统计}
+\label{sec:city_distribution}
+
+Yelp数据集覆盖24个州、1,261个城市，共117,788个POI。城市POI数量分布呈长尾分布，如表所示：
+
+\begin{table}[htbp]
+\centering
+\caption{Yelp数据集Top-10城市POI数量统计}
+\label{tab:city_distribution}
+\begin{tabular}{llr}
+\toprule
+排名 & 城市 & POI数量 \\
+\midrule
+1 & Philadelphia (PA) & 11,711 \\
+2 & Tampa (FL) & 6,943 \\
+3 & Tucson (AZ) & 6,701 \\
+4 & Indianapolis (IN) & 6,010 \\
+5 & Nashville (TN) & 5,554 \\
+6 & New Orleans (LA) & 5,155 \\
+7 & Edmonton (AB) & 4,381 \\
+8 & Reno (NV) & 4,143 \\
+9 & Saint Louis (MO) & 3,795 \\
+10 & Santa Barbara (CA) & 2,826 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Philadelphia数据子集构建规则}
+\label{sec:philly_data_rules}
+
+当针对Philadelphia城市构建训练数据子集时，采用以下规则：
+
+\textbf{1. 城市级数据抽取}：从按州/城市分层的目录结构（`PA/Philadelphia/`）中直接加载该城市的全部POI数据，避免跨城市数据污染。
+
+\textbf{2. 特征维度设计}：采用GNPR-SID V2特征方案，总维度79维（无属性）或143维（含属性），具体构成为：
+\begin{itemize}
+    \item 类别嵌入：64维，使用SentenceTransformer或可学习哈希嵌入
+    \item 空间坐标：3维，经纬度转换为单位球面3D坐标
+    \item 时间特征：12维，Fourier展开捕捉周期性（6频率×sin/cos）
+    \item 属性嵌入（可选）：64维，从POI的attributes字段文本编码
+\end{itemize}
+
+\textbf{3. 数据质量过滤}：仅保留`is_poi=True`的记录，确保为有效商户而非其他类型实体。
+
+\textbf{4. 时间分布聚合}：从用户签到记录（review_poi.json）中统计每个POI的访问时间分布，包括时段比例（早/午/晚/夜）和周内比例（工作日/周末）。
+
+\textbf{5. 类别标签处理}：从POI的categories字段提取所有类别标签，映射到类别词表。单个POI最多保留5个类别，不足部分补零。
+
+Philadelphia数据子集共11,711个POI，675,543条用户评论，为训练RQ-VAE模型提供充足的样本量。
+
+\subsection{选择Philadelphia作为训练数据的原因}
+\label{sec:philly_selection}
+
+\textbf{选择Philadelphia作为训练数据的原因}：
+\begin{enumerate}
+    \item \textbf{数据规模最大}：11,711个POI，675,543条用户评论（占全量数据集的14.9\%），数据量充足
+    \item \textbf{避免跨城市复杂性}：单一城市区域，POI之间的地理距离和语义相关性更加一致
+\end{enumerate}
+

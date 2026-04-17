@@ -1,0 +1,148 @@
+\documentclass[UTF8, a4paper, oneside]{ctexbook}
+
+% --- 常用宏包 ---
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{soul}           % 高亮文本
+\usepackage{xcolor}         % 颜色支持
+\definecolor{hlbg_y}{RGB}{255, 230, 153}  % 浅黄色高亮背景
+\definecolor{hlbg_b}{RGB}{220, 235, 250}  % 浅蓝色
+\definecolor{hlbg_g}{RGB}{220, 250, 230}  % 浅绿色
+
+\usepackage{geometry}
+\geometry{
+    a4paper,
+    left=3cm,
+    right=3cm,
+    top=2.5cm,
+    bottom=2cm
+}
+
+% --- 图表标题格式设置 (核心修复区) ---
+\usepackage{caption}
+% 必须先声明，caption 才能识别 song 和 wuhao 这两个 key
+\DeclareCaptionFont{song}{\songti}
+\DeclareCaptionFont{wuhao}{\zihao{5}}
+
+\captionsetup{
+    font={song, wuhao}, 
+    labelformat=simple,
+    labelsep=quad,
+    textformat=simple
+}
+% 统一应用，不再报 undefined 错误
+\captionsetup[table]{font={song, wuhao}}
+\captionsetup[figure]{font={song, wuhao}}
+
+% --- 页眉页脚 ---
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[C]{\songti\zihao{-5} 中山大学本科毕业论文}
+\fancyfoot[C]{\songti\zihao{-5} \thepage}
+
+% --- 脚注格式：修正版 ---
+\usepackage{footmisc}
+
+% 1. 设置脚注正文的字体和字号（宋体小五）
+\renewcommand{\footnotelayout}{\songti\zihao{-5}}
+
+% 2. 修正脚注编号格式（非上标，且保持编号后的间距）
+\makeatletter
+\renewcommand\@makefnmark{\hbox{\normalfont\@thefnmark}} % 编号不出上标
+\renewcommand\@makefntext[1]{%
+    \noindent\makebox[1.5em][l]{\@thefnmark}#1% 编号左对齐，留出固定宽度
+}
+\makeatother
+
+% --- 标题页信息 ---
+\def\thesisTitle{基于语义标识符和大语言模型的POI序列推荐研究}
+\def\thesisTitleEn{POI Sequence Recommendation Based on Semantic Identifier and Large Language Model}
+\def\authorName{叶文浩}
+\def\studentID{22330128}
+\def\department{人工智能学院}
+\def\major{人工智能专业}
+\def\supervisor{刘威}
+\def\dateYear{2026}
+\def\dateMonth{4}
+
+% --- 正文章节格式设置 ---
+\ctexset{
+    chapter={
+        format=\centering\heiti\zihao{3},
+        beforeskip=0pt,
+        afterskip=20pt
+    },
+    section={
+        format=\raggedright\heiti\zihao{4},
+        beforeskip=20pt,
+        afterskip=10pt
+    },
+    % 二级及以下节标题：宋体小四号加粗左对齐空两格
+    subsection={
+        format=\songti\zihao{-4}\textbf,
+        indent=2\ccwd,
+        beforeskip=15pt,
+        afterskip=8pt
+    },
+    subsubsection={
+        format=\songti\zihao{-4}\textbf,
+        indent=2\ccwd,
+        beforeskip=10pt,
+        afterskip=6pt
+    }
+}
+
+\usepackage{hyperref} % 建议放在大部分宏包之后
+
+\begin{document}
+
+
+
+\frontmatter
+% 摘要 (请确保这些 .tex 文件存在)
+% \include{chinese_abstract}
+% \include{english_abstract}
+
+% 目录
+\tableofcontents
+\listoffigures
+\listoftables
+
+% 正文
+\mainmatter
+\songti\zihao{-4}  % 全局正文：宋体小四号
+
+
+% 第一章 绪论
+\include{chapter1}
+
+% 第二章 问题定义和代表性方法
+\include{chapter2}
+
+% 第三章 基于RQ-VAE的语义ID生成与冲突解决
+\include{chapter3}
+
+% 第四章 基于QLoRA-LLM的POI序列推荐
+\include{chapter4}
+
+% 参考文献
+\clearpage
+\begin{center}
+    \heiti\zihao{3} 参考文献
+\end{center}
+\addcontentsline{toc}{chapter}{参考文献}
+\bibliographystyle{gbt7714-numerical}
+\bibliography{references}
+
+% 致谢
+\appendix
+\include{acknowledgements}
+
+% 附录
+\include{appendix}
+
+\end{document}
