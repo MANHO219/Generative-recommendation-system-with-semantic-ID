@@ -42,6 +42,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--prompt_export_dir', type=str, default=None, help='prompt 导出目录')
     parser.add_argument('--min_user_interactions', type=int, default=None, help='用户最小有效访问数阈值（默认取 config）')
     parser.add_argument('--test_mode', type=str, default=None, choices=['sliding', 'last_item'], help='测试口径：sliding 或 last_item')
+    parser.add_argument('--preprocess_pipeline', type=str, default=None, choices=['legacy', 'yelp_session'], help='数据预处理流程：legacy 或 yelp_session')
+    parser.add_argument('--session_enable_filter_low_frequency', action='store_true', help='启用 Session 低频 POI/User 过滤')
+    parser.add_argument('--session_min_poi_freq', type=int, default=None, help='Session POI 最小频次阈值（严格 > 阈值才保留）')
+    parser.add_argument('--session_min_user_freq', type=int, default=None, help='Session User 最小频次阈值（严格 > 阈值才保留）')
+    parser.add_argument('--no_session_remove_isolated_24h', action='store_true', help='关闭 Session 24h 双侧孤立访问剔除')
+    parser.add_argument('--session_time_interval_min', type=int, default=None, help='Session 会话切分间隔（分钟）')
+    parser.add_argument('--no_session_ignore_singleton_sessions', action='store_true', help='关闭 Session 单点会话忽略')
+    parser.add_argument('--no_session_remove_unseen_user_poi', action='store_true', help='关闭 Session 冷启动过滤')
     parser.add_argument('--no_export_last_item_test', action='store_true', help='在 sliding 模式下不额外导出 test_last_item_* 文件')
     parser.add_argument('--strict_kcore', action='store_true', help='构建前执行严格 k-core 闭包过滤')
     parser.add_argument('--k_core', type=int, default=None, help='严格 k-core 的 k 值（默认取 config）')
@@ -76,6 +84,22 @@ def main() -> None:
 
     if args.test_mode is not None:
         DATA_CONFIG['test_mode'] = args.test_mode
+    if args.preprocess_pipeline is not None:
+        DATA_CONFIG['preprocess_pipeline'] = args.preprocess_pipeline
+    if args.session_enable_filter_low_frequency:
+        DATA_CONFIG['session_enable_filter_low_frequency'] = True
+    if args.session_min_poi_freq is not None:
+        DATA_CONFIG['session_min_poi_freq'] = int(args.session_min_poi_freq)
+    if args.session_min_user_freq is not None:
+        DATA_CONFIG['session_min_user_freq'] = int(args.session_min_user_freq)
+    if args.no_session_remove_isolated_24h:
+        DATA_CONFIG['session_remove_isolated_24h'] = False
+    if args.session_time_interval_min is not None:
+        DATA_CONFIG['session_time_interval_min'] = int(args.session_time_interval_min)
+    if args.no_session_ignore_singleton_sessions:
+        DATA_CONFIG['session_ignore_singleton_sessions'] = False
+    if args.no_session_remove_unseen_user_poi:
+        DATA_CONFIG['session_remove_unseen_user_poi'] = False
     DATA_CONFIG['export_last_item_test'] = not args.no_export_last_item_test
 
     DATA_CONFIG['enable_strict_kcore'] = bool(args.strict_kcore)

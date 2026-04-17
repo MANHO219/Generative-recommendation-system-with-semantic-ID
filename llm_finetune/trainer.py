@@ -593,6 +593,14 @@ def main():
     parser.add_argument('--min_user_interactions', type=int, default=None, help='用户最小有效访问数阈值（默认取 config）')
     parser.add_argument('--dataset_dir', type=str, default=None, help='训练数据目录（可覆盖 config）')
     parser.add_argument('--semantic_ids_path', type=str, default=None, help='semantic_ids.json 路径（可覆盖 config）')
+    parser.add_argument('--preprocess_pipeline', type=str, default=None, choices=['legacy', 'yelp_session'], help='数据预处理流程：legacy 或 yelp_session')
+    parser.add_argument('--session_enable_filter_low_frequency', action='store_true', help='启用 Session 低频 POI/User 过滤')
+    parser.add_argument('--session_min_poi_freq', type=int, default=None, help='Session POI 最小频次阈值（严格 > 阈值才保留）')
+    parser.add_argument('--session_min_user_freq', type=int, default=None, help='Session User 最小频次阈值（严格 > 阈值才保留）')
+    parser.add_argument('--no_session_remove_isolated_24h', action='store_true', help='关闭 Session 24h 双侧孤立访问剔除')
+    parser.add_argument('--session_time_interval_min', type=int, default=None, help='Session 会话切分间隔（分钟）')
+    parser.add_argument('--no_session_ignore_singleton_sessions', action='store_true', help='关闭 Session 单点会话忽略')
+    parser.add_argument('--no_session_remove_unseen_user_poi', action='store_true', help='关闭 Session 冷启动过滤')
     parser.add_argument('--force_rebuild_cache', action='store_true', help='训练前删除 dataset cache 强制重建')
     args = parser.parse_args()
 
@@ -602,6 +610,22 @@ def main():
         DATA_CONFIG['semantic_ids_path'] = str(Path(args.semantic_ids_path).resolve())
     if args.min_user_interactions is not None:
         DATA_CONFIG['min_user_interactions'] = max(2, int(args.min_user_interactions))
+    if args.preprocess_pipeline is not None:
+        DATA_CONFIG['preprocess_pipeline'] = args.preprocess_pipeline
+    if args.session_enable_filter_low_frequency:
+        DATA_CONFIG['session_enable_filter_low_frequency'] = True
+    if args.session_min_poi_freq is not None:
+        DATA_CONFIG['session_min_poi_freq'] = int(args.session_min_poi_freq)
+    if args.session_min_user_freq is not None:
+        DATA_CONFIG['session_min_user_freq'] = int(args.session_min_user_freq)
+    if args.no_session_remove_isolated_24h:
+        DATA_CONFIG['session_remove_isolated_24h'] = False
+    if args.session_time_interval_min is not None:
+        DATA_CONFIG['session_time_interval_min'] = int(args.session_time_interval_min)
+    if args.no_session_ignore_singleton_sessions:
+        DATA_CONFIG['session_ignore_singleton_sessions'] = False
+    if args.no_session_remove_unseen_user_poi:
+        DATA_CONFIG['session_remove_unseen_user_poi'] = False
 
     DATA_CONFIG['enable_strict_kcore'] = bool(args.strict_kcore)
     if args.k_core is not None:

@@ -11,7 +11,7 @@ import re
 import logging
 import sys
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import pandas as pd
 from pathlib import Path
 
@@ -272,6 +272,13 @@ class DatasetBuilder:
         if gnpr_paths and all(gnpr_paths.get(split) for split in ['train', 'val', 'test']):
             return self._build_from_gnpr_json(gnpr_paths)
 
+        preprocess_pipeline = DATA_CONFIG.get('preprocess_pipeline', 'legacy')
+        if preprocess_pipeline == 'yelp_session':
+            return self._build_with_session_pipeline()
+        if preprocess_pipeline != 'legacy':
+            raise ValueError(f"Unsupported preprocess_pipeline: {preprocess_pipeline}")
+
+
         print("Starting dataset construction...")
         
         # Load raw data
@@ -431,6 +438,239 @@ class DatasetBuilder:
         print("Dataset preparation complete.")
         return splits
 
+    def _build_with_session_pipeline(self) -> Dict[str, List[Dict[str, Any]]]:
+        print("Starting dataset construction with Yelp session pipeline...")
+
+        print("Loading raw data...")
+        businesses_df = pd.read_json(self.dataset_dir / 'business_poi.json', lines=True)
+        users_df = pd.read_json(self.dataset_dir / 'user_active.json', lines=True)
+        print("Loading reviews (this may take a while)...")
+        reviews_df = pd.read_json(self.dataset_dir / 'review_poi.json', lines=True)
+        reviews_df['date'] = pd.to_datetime(reviews_df['date'])
+
+        print("Applying session pipeline on Yelp reviews...")
+        reviews_df = self._apply_session_pipeline_to_reviews(reviews_df)
+
+        with open(self.semantic_ids_path, 'r', encoding='utf-8') as f:
+            semantic_ids = json.load(f)
+
+        print("Indexing data...")
+        businesses_dict = businesses_df.set_index('business_id').to_dict('index')
+        users_dict = users_df.set_index('user_id').to_dict('index')
+
+        max_history = int(DATA_CONFIG['max_history_length'])
+        min_user_interactions = int(DATA_CONFIG.get('min_user_interactions', 2))
+        min_user_interactions = max(2, min_user_interactions)
+
+        grouped = reviews_df.sort_values(['user_id', 'date']).groupby('user_id')
+        total_groups = len(grouped)
+        kept_user_count = 0
+
+        splits: Dict[str, List[Dict[str, Any]]] = {
+            'train': [],
+            'val': [],
+            'test': [],
+        }
+
+        for user_id, group in grouped:
+            group = group.sort_values('date')
+
+            visits = []
+            for _, row in group.iterrows():
+                split_tag = str(row.get('SplitTag', 'ignore'))
+                if split_tag not in {'train', 'validation', 'test'}:
+                    continue
+
+                business_id = row['business_id']
+                if business_id not in businesses_dict:
+                    continue
+                if business_id not in semantic_ids:
+                    continue
+
+                business_info = businesses_dict[business_id]
+                visits.append({
+                    'split_tag': split_tag,
+                    'business_id': business_id,
+                    'business_name': business_info['name'],
+                    'categories': business_info.get('categories', ''),
+                    'stars': row['stars'],
+                    'date': row['date'].isoformat(),
+                    'latitude': business_info['latitude'],
+                    'longitude': business_info['longitude'],
+                    'sid': _to_angle_bracket_sid(semantic_ids[business_id]),
+                })
+
+            if len(visits) < min_user_interactions:
+                continue
+            kept_user_count += 1
+
+            if user_id not in users_dict:
+                continue
+            user_info = users_dict[user_id]
+            user_info_dict = {
+                'review_count': int(user_info['review_count']),
+                'average_stars': float(user_info['average_stars']),
+            }
+
+            for i in range(1, len(visits)):
+                history = visits[max(0, i - max_history):i]
+                target = visits[i]
+                target_split = target['split_tag']
+
+                if not history:
+                    continue
+
+                sample = {
+                    'user_id': user_id,
+                    'user_info': user_info_dict,
+                    'history': [{k: v for k, v in h.items() if k != 'split_tag'} for h in history],
+                    'target': {k: v for k, v in target.items() if k != 'split_tag'},
+                    'target_sid': target['sid'],
+                }
+
+                if target_split == 'train':
+                    splits['train'].append(sample)
+                elif target_split == 'validation':
+                    splits['val'].append(sample)
+                elif target_split == 'test':
+                    splits['test'].append(sample)
+
+        print(
+            f"Users kept after min interactions filter: {kept_user_count}/{total_groups} "
+            f"(min_user_interactions={min_user_interactions})"
+        )
+        print(
+            f"Yelp-session split samples | train={len(splits['train'])} "
+            f"val={len(splits['val'])} test={len(splits['test'])}"
+        )
+
+        if DATA_CONFIG.get('test_mode', 'sliding') != 'sliding':
+            print("Warning: test_mode is ignored under preprocess_pipeline='yelp_session'.")
+
+        for split_name, split_samples in splits.items():
+            path = self.cache_dir / f"{split_name}_samples.json"
+            print(f"Saving {split_name} cache to {path} ({len(split_samples)} samples)...")
+            _write_json_atomic(path, split_samples)
+
+        print("Yelp session pipeline dataset preparation complete.")
+        return splits
+
+    def _apply_session_pipeline_to_reviews(self, reviews_df: pd.DataFrame) -> pd.DataFrame:
+        temp = reviews_df.rename(columns={'user_id': 'UId', 'business_id': 'PId', 'date': 'Time'}).copy()
+        temp = temp.sort_values(['UId', 'Time']).reset_index(drop=True)
+
+        if bool(DATA_CONFIG.get('session_enable_filter_low_frequency', False)):
+            temp = self._filter_low_frequency(
+                df=temp,
+                min_poi_freq=int(DATA_CONFIG.get('session_min_poi_freq', 10)),
+                min_user_freq=int(DATA_CONFIG.get('session_min_user_freq', 10)),
+            )
+
+        temp = self._split_by_global_time(
+            temp,
+            train_ratio=float(DATA_CONFIG.get('train_split', 0.8)),
+            val_ratio=float(DATA_CONFIG.get('val_split', 0.1)),
+        )
+
+        if bool(DATA_CONFIG.get('session_remove_isolated_24h', True)):
+            temp = self._remove_isolated_checkins_24h(temp)
+
+        temp = self._build_pseudo_sessions(
+            temp,
+            session_time_interval_min=int(DATA_CONFIG.get('session_time_interval_min', 60 * 24)),
+        )
+
+        if bool(DATA_CONFIG.get('session_ignore_singleton_sessions', True)):
+            temp = self._ignore_singleton_sessions(temp)
+
+        if bool(DATA_CONFIG.get('session_remove_unseen_user_poi', True)):
+            temp = self._remove_unseen_user_poi(temp)
+
+        temp = temp.rename(columns={'UId': 'user_id', 'PId': 'business_id', 'Time': 'date'})
+        temp['date'] = pd.to_datetime(temp['date'])
+        return temp.sort_values(['user_id', 'date']).reset_index(drop=True)
+    def _lookup_semantic_sid(self, semantic_ids: Dict[str, str], poi_id: Any) -> Optional[str]:
+        if poi_id in semantic_ids:
+            return semantic_ids[poi_id]
+        key_str = str(poi_id)
+        if key_str in semantic_ids:
+            return semantic_ids[key_str]
+        try:
+            key_int = int(poi_id)
+            if key_int in semantic_ids:
+                return semantic_ids[key_int]
+            key_int_str = str(key_int)
+            if key_int_str in semantic_ids:
+                return semantic_ids[key_int_str]
+        except (ValueError, TypeError):
+            return None
+        return None
+
+    def _filter_low_frequency(self, df: pd.DataFrame, min_poi_freq: int, min_user_freq: int) -> pd.DataFrame:
+        poi_count = df.groupby('PId')['UId'].count()
+        keep_pois = set(poi_count[poi_count > min_poi_freq].index)
+        df = df[df['PId'].isin(keep_pois)]
+
+        user_count = df.groupby('UId')['PId'].count()
+        keep_users = set(user_count[user_count > min_user_freq].index)
+        df = df[df['UId'].isin(keep_users)]
+        return df.sort_values(by=['UId', 'Time'], ascending=True).reset_index(drop=True)
+
+    def _split_by_global_time(self, df: pd.DataFrame, train_ratio: float, val_ratio: float) -> pd.DataFrame:
+        ratio_sum = train_ratio + val_ratio
+        if train_ratio <= 0 or val_ratio < 0 or ratio_sum >= 1:
+            raise ValueError(
+                f"Invalid split ratios for session pipeline: train_split={train_ratio}, val_split={val_ratio}. "
+                "Require train_split > 0, val_split >= 0, and train_split + val_split < 1."
+            )
+
+        df = df.sort_values('Time').reset_index(drop=True)
+        n = len(df)
+        train_end = int(n * train_ratio)
+        val_end = int(n * ratio_sum)
+        df['SplitTag'] = 'train'
+        df.loc[train_end:val_end - 1, 'SplitTag'] = 'validation'
+        df.loc[val_end:, 'SplitTag'] = 'test'
+        return df.sort_values(['UId', 'Time']).reset_index(drop=True)
+
+    def _remove_isolated_checkins_24h(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.sort_values(by=['UId', 'Time'], ascending=True).reset_index(drop=True)
+        prev_t = df.groupby('UId')['Time'].shift(1)
+        next_t = df.groupby('UId')['Time'].shift(-1)
+        gap_prev = (df['Time'] - prev_t).dt.total_seconds().fillna(float('inf'))
+        gap_next = (next_t - df['Time']).dt.total_seconds().fillna(float('inf'))
+        isolated = (gap_prev > 86400) & (gap_next > 86400)
+        return df[~isolated].reset_index(drop=True)
+
+    def _build_pseudo_sessions(self, df: pd.DataFrame, session_time_interval_min: int) -> pd.DataFrame:
+        df = df.sort_values(by=['UId', 'Time'], ascending=True).reset_index(drop=True)
+        diffs = df.groupby('UId')['Time'].diff()
+        diffs_min = diffs.dt.total_seconds() / 60.0
+        new_session = diffs.isna() | (diffs_min > session_time_interval_min)
+        df['pseudo_session_trajectory_id'] = new_session.cumsum().astype(int) - 1
+        return df
+
+    def _ignore_singleton_sessions(self, df: pd.DataFrame) -> pd.DataFrame:
+        counts = df.groupby('pseudo_session_trajectory_id')['Time'].transform('count')
+        df = df.copy()
+        df.loc[counts == 1, 'SplitTag'] = 'ignore'
+        return df
+
+    def _remove_unseen_user_poi(self, df: pd.DataFrame) -> pd.DataFrame:
+        train = df[df['SplitTag'] == 'train']
+        val = df[df['SplitTag'] == 'validation']
+        test = df[df['SplitTag'] == 'test']
+
+        train_users = set(train['UId'])
+        train_pois = set(train['PId'])
+
+        val = val[val['UId'].isin(train_users) & val['PId'].isin(train_pois)].reset_index(drop=True)
+        test = test[test['UId'].isin(train_users) & test['PId'].isin(train_pois)].reset_index(drop=True)
+
+        ignored = df[df['SplitTag'] == 'ignore'].reset_index(drop=True)
+        merged = pd.concat([train.reset_index(drop=True), val, test, ignored], axis=0)
+        return merged.sort_values(['UId', 'Time']).reset_index(drop=True)
+
     def _build_from_gnpr_json(self, gnpr_paths: Dict[str, str]) -> Dict[str, List[Dict[str, Any]]]:
         print('Loading GNPR instruction datasets...')
         splits = {}
@@ -463,7 +703,15 @@ def prepare_datasets():
     
     # Check if cache exists
     schema = DATA_CONFIG.get('cache_schema', 'default')
-    schema = f"{schema}|test_mode={DATA_CONFIG.get('test_mode', 'sliding')}"
+    schema = f"{schema}|pipeline={DATA_CONFIG.get('preprocess_pipeline', 'legacy')}|test_mode={DATA_CONFIG.get('test_mode', 'sliding')}"
+    if DATA_CONFIG.get('preprocess_pipeline', 'legacy') == 'yelp_session':
+        schema = (
+            f"{schema}|session_filter={DATA_CONFIG.get('session_enable_filter_low_frequency', False)}"
+            f"|session_remove_isolated_24h={DATA_CONFIG.get('session_remove_isolated_24h', True)}"
+            f"|session_ignore_singleton_sessions={DATA_CONFIG.get('session_ignore_singleton_sessions', True)}"
+            f"|session_remove_unseen_user_poi={DATA_CONFIG.get('session_remove_unseen_user_poi', True)}"
+            f"|session_gap_min={DATA_CONFIG.get('session_time_interval_min', 60 * 24)}"
+        )
     schema_path = Path(cache_dir) / 'schema.txt' if cache_dir else None
 
     cache_exists = cache_dir and all(

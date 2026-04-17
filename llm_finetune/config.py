@@ -61,6 +61,14 @@ DATA_CONFIG = {
     'min_user_interactions': 5,  # 显式用户筛选：至少保留 5 条有效访问
     'test_mode': 'sliding',  # sliding: 滑窗测试；last_item: 每用户仅最后一次目标
     'export_last_item_test': True,  # 在 sliding 模式下额外导出公平对比用的 last-item 测试集
+    'preprocess_pipeline': 'legacy',  # legacy: Yelp JSON 流程；yelp_session: 在 Yelp 主流程中启用会话切分/清洗
+    'session_enable_filter_low_frequency': False,
+    'session_min_poi_freq': 10,
+    'session_min_user_freq': 10,
+    'session_remove_isolated_24h': True,
+    'session_time_interval_min': 60 * 24,
+    'session_ignore_singleton_sessions': True,
+    'session_remove_unseen_user_poi': True,
     'enable_strict_kcore': False,
     'k_core': 5,
     'k_core_use_cache': True,
