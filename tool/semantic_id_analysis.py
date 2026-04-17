@@ -446,18 +446,18 @@ def main():
         semantic_ids = load_semantic_ids(sid_path)
         print(f"  {len(semantic_ids)} semantic IDs.")
 
-        n_disambig = sum(1 for s in semantic_ids.values() if '<' in s)
+        n_disambig = sum(1 for s in semantic_ids.values() if '<' in s or '[' in s)
         print(f"  Disambig: {n_disambig} ({n_disambig/len(semantic_ids)*100:.1f}%)")
 
         if args.compute_metrics:
             # 计算 prefix 分布统计
             prefix_counts = defaultdict(int)
-            pluscode_counts = 0
+            n_disambig_full = 0
             for sid in semantic_ids.values():
                 prefix = get_prefix(sid, args.prefix_len)
                 prefix_counts[prefix] += 1
-                if '<' in sid:
-                    pluscode_counts += 1
+                if '<' in sid or '[' in sid:
+                    n_disambig_full += 1
 
             total_pois = len(semantic_ids)
             n_prefixes = len(prefix_counts)
@@ -473,13 +473,13 @@ def main():
 
             entropy = compute_entropy(prefix_counts)
             gini = compute_gini(prefix_counts)
-            pluscode_rate = pluscode_counts / total_pois * 100 if total_pois > 0 else 0
+            disambig_rate = n_disambig_full / total_pois * 100 if total_pois > 0 else 0
 
             print(f"  Coverage: {coverage:.2f}%")
             print(f"  Collision Rate: {collision_rate:.4f}")
             print(f"  Entropy: {entropy:.4f}")
             print(f"  Gini: {gini:.4f}")
-            print(f"  PlusCode Rate: {pluscode_rate:.2f}%")
+            print(f"  Disambig Rate: {disambig_rate:.2f}%")
 
         # CLI 参数名到 POI 实际字段名的映射
         region_field_map = {'neighborhood': 'plus_code_neighborhood'}
