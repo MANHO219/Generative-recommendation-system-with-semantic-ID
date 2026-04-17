@@ -176,9 +176,99 @@ def normalize_sid_text(value: str) -> str:
         return text
 
 
-def load_model_and_tokenizer(model_path: str, base_model_path: Optional[str] = None):
-    model_dir = Path(model_path)
+def _resolve_hf_snapshot_path(path_or_repo: str) -> str:
+    candidate = Path(path_or_repo)
+    if not candidate.exists() or not candidate.is_dir():
+        return path_or_repo
+
+    if (candidate / "config.json").exists():
+        return str(candidate)
+
+    snapshots_dir = candidate / "snapshots"
+    if not snapshots_dir.exists() or not snapshots_dir.is_dir():
+        return path_or_repo
+
+    ref_main = candidate / "refs" / "main"
+    if ref_main.exists():
+        revision = ref_main.read_text(encoding="utf-8").strip()
+        if revision:
+            pinned = snapshots_dir / revision
+            if pinned.exists() and (pinned / "config.json").exists():
+                return str(pinned)
+
+    snapshot_dirs = [item for item in snapshots_dir.iterdir() if item.is_dir()]
+    snapshot_dirs.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+    for item in snapshot_dirs:
+        if (item / "config.json").exists():
+            return str(item)
+
+    return path_or_repo
+
+
+def _resolve_torch_dtype(dtype_name: str):
+    if dtype_name == "auto":
+        if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+            return torch.bfloat16
+        if torch.cuda.is_available():
+            return torch.float16
+        return None
+    if dtype_name == "bfloat16":
+        return torch.bfloat16
+    if dtype_name == "float16":
+        return torch.float16
+    if dtype_name == "float32":
+        return torch.float32
+    raise ValueError(f"Unsupported torch dtype: {dtype_name}")
+
+
+def _is_extra_special_tokens_compat_error(error: Exception) -> bool:
+    message = str(error)
+    return isinstance(error, AttributeError) and "has no attribute 'keys'" in message
+
+
+def _load_tokenizer_with_fallback(model_path: str, fallback_path: Optional[str] = None):
+    candidate_paths = [model_path]
+    if fallback_path and fallback_path != model_path:
+        candidate_paths.append(fallback_path)
+
+    attempts = [
+        {},
+        {"extra_special_tokens": {}},
+        {"extra_special_tokens": {}, "use_fast": False},
+    ]
+
+    last_error: Optional[Exception] = None
+    for path in candidate_paths:
+        for kwargs in attempts:
+            try:
+                if kwargs:
+                    print(f"[Info] loading tokenizer from: {path} with fallback kwargs={kwargs}")
+                else:
+                    print(f"[Info] loading tokenizer from: {path}")
+                return AutoTokenizer.from_pretrained(path, trust_remote_code=True, **kwargs)
+            except Exception as error:
+                last_error = error
+                if _is_extra_special_tokens_compat_error(error):
+                    continue
+                if isinstance(error, OSError):
+                    break
+                raise
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Failed to load tokenizer with fallback strategy.")
+
+
+def load_model_and_tokenizer(
+    model_path: str,
+    base_model_path: Optional[str] = None,
+    torch_dtype_name: str = "auto",
+    attn_implementation: Optional[str] = None,
+):
+    resolved_model_path = _resolve_hf_snapshot_path(model_path)
+    model_dir = Path(resolved_model_path)
     is_adapter = (model_dir / "adapter_config.json").exists() and not (model_dir / "config.json").exists()
+    torch_dtype = _resolve_torch_dtype(torch_dtype_name)
 
     if is_adapter:
         with open(model_dir / "adapter_config.json", "r", encoding="utf-8") as file:
@@ -186,23 +276,42 @@ def load_model_and_tokenizer(model_path: str, base_model_path: Optional[str] = N
         resolved_base_model = base_model_path or adapter_config.get("base_model_name_or_path")
         if not resolved_base_model:
             raise ValueError("Adapter checkpoint requires --base_model_path or valid base_model_name_or_path.")
-        tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        resolved_base_model = _resolve_hf_snapshot_path(resolved_base_model)
+
+        tokenizer = _load_tokenizer_with_fallback(
+            model_path=resolved_model_path,
+            fallback_path=resolved_base_model,
+        )
+        model_kwargs = {
+            "device_map": "auto",
+            "trust_remote_code": True,
+        }
+        if torch_dtype is not None:
+            model_kwargs["torch_dtype"] = torch_dtype
+        if attn_implementation:
+            model_kwargs["attn_implementation"] = attn_implementation
+
         base_model = AutoModelForCausalLM.from_pretrained(
             resolved_base_model,
-            device_map="auto",
-            torch_dtype=torch.bfloat16 if torch.cuda.is_available() else None,
-            trust_remote_code=True,
+            **model_kwargs,
         )
-        model = PeftModel.from_pretrained(base_model, model_path)
+        model = PeftModel.from_pretrained(base_model, resolved_model_path)
+        print(f"[Info] loaded adapter: {resolved_model_path}")
+        print(f"[Info] loaded base model: {resolved_base_model}")
         return model, tokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        device_map="auto",
-        torch_dtype=torch.bfloat16 if torch.cuda.is_available() else None,
-        trust_remote_code=True,
-    )
+    tokenizer = _load_tokenizer_with_fallback(model_path=resolved_model_path)
+    model_kwargs = {
+        "device_map": "auto",
+        "trust_remote_code": True,
+    }
+    if torch_dtype is not None:
+        model_kwargs["torch_dtype"] = torch_dtype
+    if attn_implementation:
+        model_kwargs["attn_implementation"] = attn_implementation
+
+    model = AutoModelForCausalLM.from_pretrained(resolved_model_path, **model_kwargs)
+    print(f"[Info] loaded model: {resolved_model_path}")
     return model, tokenizer
 
 
@@ -362,9 +471,16 @@ def main():
     parser.add_argument("--num_beams", type=int, default=5)
     parser.add_argument("--top_k", type=int, default=5)
     parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--torch_dtype", type=str, default="auto", choices=["auto", "bfloat16", "float16", "float32"])
+    parser.add_argument("--attn_implementation", type=str, default=None)
     args = parser.parse_args()
 
-    model, tokenizer = load_model_and_tokenizer(args.model_path, args.base_model_path)
+    model, tokenizer = load_model_and_tokenizer(
+        args.model_path,
+        args.base_model_path,
+        args.torch_dtype,
+        args.attn_implementation,
+    )
 
     semantic_ids = load_semantic_ids(args.semantic_ids_path)
     trie = build_trie(tokenizer, semantic_ids)

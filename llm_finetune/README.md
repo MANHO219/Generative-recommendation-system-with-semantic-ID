@@ -2,6 +2,93 @@
 
 ## 训练命令
 
+## 仅构建数据缓存（不启动训练）
+
+```bash
+PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+/mnt/data/liuwei/anaconda3/envs/ywh/bin/python \
+/mnt/data/liuwei/yewenhao/main/llm_finetune/build_data_only.py \
+    --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids.json \
+    --min_user_interactions 5 \
+    --test_mode sliding \
+    --strict_kcore --k_core 5 \
+    --cache_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore \
+    --prompt_export_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore \
+    --force_rebuild
+```
+
+- 该命令只会调用 `prepare_datasets()`，生成：
+    - `train/val/test_samples.json`
+    - `train/val/test_prompts.json`（默认导出，可用 `--no_export_prompts` 关闭）
+- 默认 `--test_mode sliding`：训练/验证/测试都按滑动窗口构建；同时会额外导出公平对比用的 `test_last_item_samples.json` 与 `test_last_item_prompts.json`。
+- `--min_user_interactions` 会在构建时显式过滤用户（按“可映射到 SID 的有效 visits 数”计数），推荐设为 `5` 以对齐 k-core 口径。
+- `--strict_kcore --k_core 5` 会在构建前调用 `semantic_id/kcore.py` 的迭代闭包过滤逻辑，确保用户/商铺双向闭包一致。
+- 更换新的 codebook/SID 后，建议加 `--force_rebuild` 强制重建缓存。
+
+### 公平对齐口径（每用户最后一次目标）
+
+```bash
+PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+/mnt/data/liuwei/anaconda3/envs/ywh/bin/python \
+/mnt/data/liuwei/yewenhao/main/llm_finetune/build_data_only.py \
+        --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids.json \
+        --min_user_interactions 5 \
+        --test_mode last_item \
+        --strict_kcore --k_core 5 \
+        --cache_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore \
+        --prompt_export_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore \
+        --force_rebuild
+```
+
+- `--test_mode last_item` 下：
+    - `test_samples.json` 将变为“每用户仅一条最后目标”测试集。
+    - `train/val` 仍来自滑窗样本（去除了每用户最后一条，避免与测试目标重叠）。
+
+### 提取 10k/2k/2k 子集（快速实验）
+
+如果你已经构建好了完整缓存，可以二次抽样出 `train=10000`、`val=2000`、`test=2000`：
+
+```bash
+PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+/mnt/data/liuwei/anaconda3/envs/ywh/bin/python \
+/mnt/data/liuwei/yewenhao/main/llm_finetune/extract_subset.py \
+    --source_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore \
+    --target_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore_10k2k2k \
+    --train_n 50000 \
+    --val_n 10000 \
+    --test_n 10000
+```
+
+如果测试要采用 STAN 对齐口径（每用户最后一次），可把测试来源切到 `test_last_item`：
+
+```bash
+PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+/mnt/data/liuwei/anaconda3/envs/ywh/bin/python \
+/mnt/data/liuwei/yewenhao/main/llm_finetune/extract_subset.py \
+    --source_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore \
+    --target_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_kcore_10k2k2k_last \
+    --train_n 10000 \
+    --val_n 2000 \
+    --test_n 2000 \
+    --test_source test_last_item
+```
+
+- 输出包含：`train/val/test_{samples,prompts}.json` 与 `subset_manifest.json`。
+- 默认随机抽样（`seed=42`）；若想按原顺序截取前 N 条，增加 `--no_shuffle`。
+
+### 直接训练（含严格闭包）
+```bash
+CUDA_VISIBLE_DEVICES=0 PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+/mnt/data/liuwei/anaconda3/envs/ywh/bin/python \
+/mnt/data/liuwei/yewenhao/main/llm_finetune/trainer.py \
+    --semantic_ids_path /mnt/data/liuwei/yewenhao/main/output/sid/PA_main_city/semantic_ids.json \
+    --min_user_interactions 5 \
+    --strict_kcore --k_core 5 \
+    --force_rebuild_cache
+```
+
+- 训练入口和 `build_data_only.py` 现在共用同一 `prepare_datasets()`，严格闭包逻辑一致。
+
 ### 单卡训练
 ```bash
 CUDA_VISIBLE_DEVICES=0 PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
@@ -39,6 +126,7 @@ rm -rf /mnt/data/liuwei/yewenhao/main/output/dataset_cache/
 llm_finetune/
 ├── config.py       # 所有配置（模型、LoRA、训练、数据、Prompt 模板）
 ├── dataset.py      # 数据集构建与缓存（DatasetBuilder、LLMFinetuneDataset、prepare_datasets）
+├── extract_subset.py # 从完整缓存提取固定规模子集（如 10k/2k/2k）
 ├── trainer.py      # 训练器主体（LLMFinetune：加载模型、训练、评估）
 ├── requirements.txt
 └── README.md
@@ -77,7 +165,8 @@ When 2024-01-17 12:00:00 user_abc12345 is likely to visit:<|im_end|>
 Yelp 原始数据（business_poi / user_active / review_poi）或 GNPR JSON（instruction/input/output）
     ↓ DatasetBuilder.build_and_save()
 标准化样本（history + target + target_sid）
-    ↓ random.seed(42) shuffle → 80/10/10 切分
+    ↓ `test_mode=sliding`：random.seed(42) shuffle → 80/10/10 切分
+    ↓ `test_mode=last_item`：test=每用户最后目标，train/val=其余滑窗样本
 output/dataset_cache/{train,val,test}_samples.json   ← 缓存文件
     ↓ LLMFinetuneDataset.__getitem__() → format_instruction()
 ChatML 格式样本

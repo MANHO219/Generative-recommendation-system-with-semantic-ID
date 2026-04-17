@@ -21,6 +21,7 @@ from semantic_id.config import get_config, get_preset_config, save_config
 from semantic_id.model import create_model, SemanticIDModel
 from semantic_id.dataset import YelpPOIDataset, create_dataloaders
 from semantic_id.trainer import SemanticIDTrainer
+from semantic_id.kcore import prepare_k_core_data_dir
 
 
 def setup_logging(log_dir: str):
@@ -44,6 +45,10 @@ def main():
     # 数据参数
     parser.add_argument('--data_dir', type=str, default='./data/yelp/processed',
                         help='处理后的数据目录')
+    parser.add_argument('--k_core', type=int, default=None,
+                        help='训练前执行 k-core 过滤（默认读取配置 data.k_core）')
+    parser.add_argument('--k_core_no_cache', action='store_true',
+                        help='禁用 k-core 缓存，每次重新生成过滤后的数据')
 
     # 配置参数
     parser.add_argument('--config', type=str, default=None,
@@ -80,6 +85,9 @@ def main():
     # 命令行参数覆盖配置
     config['data']['data_dir'] = args.data_dir
 
+    if args.k_core is not None:
+        config['data']['k_core'] = args.k_core
+
     if args.run_name:
         for key in ('log_dir', 'checkpoint_dir', 'output_dir'):
             config['paths'][key] = str(Path(config['paths'][key]) / args.run_name)
@@ -114,6 +122,26 @@ def main():
         device = 'cpu'
 
     logging.info(f"设备: {device}")
+
+    # 训练前执行 k-core（保证 codebook/训练数据口径一致）
+    k_core_value = int(config.get('data', {}).get('k_core', 0) or 0)
+    if k_core_value > 1:
+        logging.info(f"执行 k-core 预处理: k={k_core_value}")
+        filtered_data_dir, kcore_stats = prepare_k_core_data_dir(
+            data_dir=config['data']['data_dir'],
+            k=k_core_value,
+            use_cache=not args.k_core_no_cache
+        )
+        config['data']['data_dir'] = filtered_data_dir
+        logging.info(
+            "k-core 数据目录: %s (users=%s, items=%s, interactions=%s)",
+            filtered_data_dir,
+            kcore_stats.get('users'),
+            kcore_stats.get('items'),
+            kcore_stats.get('interactions'),
+        )
+    else:
+        logging.info("未启用 k-core 预处理")
 
     # 加载数据
     logging.info("加载数据...")
