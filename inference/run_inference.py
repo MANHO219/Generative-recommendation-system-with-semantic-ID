@@ -315,25 +315,31 @@ def load_model_and_tokenizer(
     return model, tokenizer
 
 
-def generate_sid_candidates(model, tokenizer, sample: Dict[str, Any], trie: TokenTrie, args) -> List[str]:
+def generate_sid_candidates(
+    model,
+    tokenizer,
+    sample: Dict[str, Any],
+    trie: Optional[TokenTrie],
+    args,
+) -> List[str]:
     prompt = build_chat_prompt(tokenizer, sample)
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     prefix_len = inputs.input_ids.shape[1]
-
-    processor = TrieConstrainedLogitsProcessor(
-        trie=trie,
-        prefix_length=prefix_len,
-        eos_token_id=tokenizer.eos_token_id,
-        allow_early_stop=True,
-    )
 
     generation_kwargs = {
         "max_new_tokens": args.max_new_tokens,
         "num_beams": args.num_beams,
         "num_return_sequences": args.num_beams,
         "do_sample": args.temperature > 0,
-        "logits_processor": LogitsProcessorList([processor]),
     }
+    if trie is not None and not args.disable_trie_constraint:
+        processor = TrieConstrainedLogitsProcessor(
+            trie=trie,
+            prefix_length=prefix_len,
+            eos_token_id=tokenizer.eos_token_id,
+            allow_early_stop=True,
+        )
+        generation_kwargs["logits_processor"] = LogitsProcessorList([processor])
     if args.temperature > 0:
         generation_kwargs["temperature"] = args.temperature
     else:
@@ -355,7 +361,7 @@ def generate_sid_candidates(model, tokenizer, sample: Dict[str, Any], trie: Toke
     return candidates
 
 
-def run_batch_eval(model, tokenizer, trie: TokenTrie, args, semantic_sid_set: set[str]) -> None:
+def run_batch_eval(model, tokenizer, trie: Optional[TokenTrie], args, semantic_sid_set: set[str]) -> None:
     with open(args.eval_samples_path, "r", encoding="utf-8") as file:
         samples = json.load(file)
 
@@ -471,6 +477,11 @@ def main():
     parser.add_argument("--num_beams", type=int, default=5)
     parser.add_argument("--top_k", type=int, default=5)
     parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument(
+        "--disable_trie_constraint",
+        action="store_true",
+        help="Disable trie-constrained decoding for ablation.",
+    )
     parser.add_argument("--torch_dtype", type=str, default="auto", choices=["auto", "bfloat16", "float16", "float32"])
     parser.add_argument("--attn_implementation", type=str, default=None)
     args = parser.parse_args()
@@ -483,8 +494,8 @@ def main():
     )
 
     semantic_ids = load_semantic_ids(args.semantic_ids_path)
-    trie = build_trie(tokenizer, semantic_ids)
     semantic_sid_set = set(semantic_ids)
+    trie = None if args.disable_trie_constraint else build_trie(tokenizer, semantic_ids)
 
     if args.eval_samples_path:
         run_batch_eval(model, tokenizer, trie, args, semantic_sid_set)
