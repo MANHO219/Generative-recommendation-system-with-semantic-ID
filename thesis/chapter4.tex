@@ -192,19 +192,18 @@ Trie树用于存储所有合法的Semantic ID序列，确保生成的ID对应真
 \subsection{数据集}
 \label{sec:dataset}
 
-实验使用Yelp数据集的Philadelphia城市子集，该子集包含约14,569个POI和大量用户签到记录。
+实验使用Yelp数据集的Philadelphia城市子集，该子集包含11,711个POI和675,543条用户评论记录。
 
 \begin{table}[htbp]
 \centering
-\caption{数据集统计}
+\caption{Philadelphia数据集统计}
 \label{tab:dataset_stats}
 \begin{tabular}{lr}
 \toprule
 项目 & 数值 \\
 \midrule
-POI数量 & 14,569 \\
-用户数量 & ~10,000+ \\
-签到记录数 & 100,000+ \\
+POI数量 & 11,711 \\
+用户评论记录数 & 675,543 \\
 \midrule
 训练集比例 & 80\% \\
 验证集比例 & 10\% \\
@@ -214,6 +213,8 @@ POI数量 & 14,569 \\
 \end{table}
 
 \textbf{数据划分}：按时间顺序切分，确保测试集用户的历史完全包含在训练集中。
+
+\textbf{补充说明}：原始Yelp数据集全量包含117,788个POI，覆盖24个州、1,261个城市。Philadelphia作为最大单城子集，POI数量为全量数据集的约9.9\%，具有充足的样本规模用于训练语义ID模型和LLM推荐模型。
 
 \subsection{评估指标}
 \label{sec:eval_metrics}
@@ -244,9 +245,9 @@ valid\_sid\_rate & 生成合法SID的比例 & $N_{valid} / N_{total}$ \\
 对比实验采用以下基线方法：
 
 \begin{itemize}
-    \item \textbf{FPMC}：因子分解个性化马尔可夫链，RecSys 2010
-    \item \textbf{STAN}：时空注意力网络，WWW 2021
-    \item \textbf{SARS}：序列感知推荐系统，RecSys 2020
+    \item \textbf{FPMC}~\cite{rendle2010factorifying}：因子分解个性化马尔可夫链（Factorized Personalized Markov Chains），RecSys 2010。该方法将矩阵分解与一阶马尔可夫链结合，建模用户偏好与序列转移的交互效应，是序列推荐领域经典基线。
+    \item \textbf{STAN}~\cite{wang2021spatial}：时空注意力网络（Spatial-Temporal Attention Network），WWW 2021。该方法在自注意力机制基础上显式建模物品之间的空间距离与时间间隔关系，适合处理带有地理标签的POI推荐任务。
+    \item \textbf{SASRec}~\cite{kang2018self}：自注意力序列推荐（Self-Attentive Sequential Recommendation），ICDM 2018。该方法利用Transformer架构中的多头自注意力机制从用户行为序列中自适应地学习长期依赖与短期偏好，是当前最具竞争力的非LLM序列推荐基线之一。
 \end{itemize}
 
 \section{推荐效果对比实验}
@@ -265,7 +266,7 @@ valid\_sid\_rate & 生成合法SID的比例 & $N_{valid} / N_{total}$ \\
 \midrule
 FPMC & - & - & - \\
 STAN & - & - & - \\
-SARS & - & - & - \\
+SASRec & - & - & - \\
 \textbf{本文方法} & - & - & - \\
 \bottomrule
 \end{tabular}
@@ -284,7 +285,7 @@ SARS & - & - & - \\
 \midrule
 FPMC & - & - & - \\
 STAN & - & - & - \\
-SARS & - & - & - \\
+SASRec & - & - & - \\
 \textbf{本文方法} & - & - & - \\
 \bottomrule
 \end{tabular}
@@ -303,7 +304,7 @@ SARS & - & - & - \\
 \midrule
 FPMC & - & - & - \\
 STAN & - & - & - \\
-SARS & - & - & - \\
+SASRec & - & - & - \\
 \textbf{本文方法} & - & - & - \\
 \bottomrule
 \end{tabular}
@@ -384,6 +385,6 @@ avg\_latency\_ms & 平均生成延迟（毫秒） \\
     \item \textbf{QLoRA微调策略}：采用4bit NF4量化和LoRA（r=16）微调Qwen3-8B-Instruct模型。
     \item \textbf{Trie约束解码}：通过Trie数据结构约束解码过程，确保生成的Semantic ID合法有效。
     \item \textbf{实验设置}：在Yelp Philadelphia数据集上进行实验，采用HR@K、MRR@K、NDCG@K等指标评估。
-    \item \textbf{推荐效果对比}：与FPMC、STAN、SARS等基线方法进行对比。
+    \item \textbf{推荐效果对比}：与FPMC、STAN、SASRec等基线方法进行对比。
     \item \textbf{消融实验}：验证冲突解决机制和Trie约束解码的有效性。
 \end{enumerate}
