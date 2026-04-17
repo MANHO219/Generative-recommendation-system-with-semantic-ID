@@ -85,7 +85,7 @@ PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
     - `train/val` 仍来自滑窗样本（去除了每用户最后一条，避免与测试目标重叠）。
 - `--preprocess_pipeline=yelp_session` 时，`test_mode` 参数被忽略，测试集直接来自 Session Pipeline 的全局时间切分。
 
-### 提取 10k/2k/2k 子集（快速实验）
+### 提取子集（快速实验）
 
 如果你已经构建好了完整缓存，可以二次抽样出 `train=10000`、`val=2000`、`test=2000`：
 
@@ -114,8 +114,29 @@ PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
     --test_source test_last_item
 ```
 
-- 输出包含：`train/val/test_{samples,prompts}.json` 与 `subset_manifest.json`。
-- 默认随机抽样（`seed=42`）；若想按原顺序截取前 N 条，增加 `--no_shuffle`。
+两种抽取模式：
+
+| 模式 | 参数 | 行为 |
+|------|------|------|
+| 按样本数 | `--train_n` | 随机选 N 条样本 |
+| 按用户比例 | `--user_fraction` | 随机选 X% 的用户，保留其所有样本 |
+
+**按用户比例抽取示例**（保留每个用户数据完整性）：
+
+```bash
+PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
+/mnt/data/liuwei/anaconda3/envs/ywh/bin/python \
+/mnt/data/liuwei/yewenhao/main/llm_finetune/extract_subset.py \
+    --source_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_yelp_session \
+    --target_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_yelp_session_frac \
+    --user_fraction 0.1
+```
+
+- `--user_fraction 0.1` 随机选取 10% 的用户，保留这些用户的所有样本
+- `--val_user_fraction 0.2` 可独立设置 val 集的用户比例（默认同 `--user_fraction`）
+- 与 `--train_n` 等参数互斥，不能同时使用
+- 输出包含：`train/val/test_{samples,prompts}.json` 与 `subset_manifest.json`
+- 默认随机抽样（`seed=42`）；若想按原顺序截取前 N 条，增加 `--no_shuffle`
 
 ### 直接训练（含严格闭包）
 ```bash
