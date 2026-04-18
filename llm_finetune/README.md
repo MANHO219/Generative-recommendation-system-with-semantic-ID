@@ -51,6 +51,7 @@ PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1 \
     --no_session_remove_unseen_user_poi \
     --strict_kcore --k_core 5 \
     --cache_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_yelp_session \
+    --prompt_export_dir /mnt/data/liuwei/yewenhao/main/output/dataset_cache_yelp_session \
     --force_rebuild
 ```
 
