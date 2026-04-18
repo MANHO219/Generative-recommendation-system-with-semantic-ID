@@ -1,0 +1,10 @@
+{
+  "total_samples": 2000,
+  "exact_match": 13,
+  "exact_match_rate": 0.0065,
+  "hit@10": 0.022,
+  "recall@10": 0.022,
+  "mrr@10": 0.011947817460317457,
+  "valid_sid_rate": 1.0,
+  "avg_latency_ms": 3247.123216032982
+}
