@@ -192,12 +192,16 @@ def evaluate(records: List[Dict[str, Any]], top_k: int) -> Dict[str, Any]:
     if total == 0:
         raise ValueError("No valid samples after parsing labels/candidates.")
 
+    # Recall@K: for single-label scenario, same as HR@K (1 if label in top-k, else 0)
+    recall = hrk / total
+
     return {
         "total": total,
         "skipped": skipped,
         "top_k": top_k,
         "hr@1": hr1 / total,
         f"hr@{top_k}": hrk / total,
+        f"recall@{top_k}": recall,
         f"mrr@{top_k}": mrr / total,
         f"ndcg@{top_k}": ndcg / total,
         "single_prediction_ratio": used_single_prediction_only / total,

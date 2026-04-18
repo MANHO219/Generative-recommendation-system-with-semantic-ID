@@ -7,6 +7,7 @@ LLM 微调训练器
 import torch
 import json
 import time
+import math
 import sys
 import re
 import argparse
@@ -123,7 +124,7 @@ class GenerativeEvalCallback(TrainerCallback):
             return
 
         model.eval()
-        exact_match = hit = mrr_sum = valid_sid = 0
+        exact_match = hit = mrr_sum = ndcg_sum = valid_sid = 0
         latencies = []
 
         for idx in range(self.num_samples):
@@ -176,13 +177,16 @@ class GenerativeEvalCallback(TrainerCallback):
                 valid_sid += 1
             if ground_truth in top_k_cands:
                 hit += 1
-                mrr_sum += 1.0 / (top_k_cands.index(ground_truth) + 1)
+                rank = top_k_cands.index(ground_truth) + 1
+                mrr_sum += 1.0 / rank
+                ndcg_sum += 1.0 / math.log2(rank + 1)
 
         total = self.num_samples
         gen_metrics = {
             'gen_exact_match':       exact_match / total,
             f'gen_hit@{self.top_k}': hit / total,
             f'gen_mrr@{self.top_k}': mrr_sum / total,
+            f'gen_ndcg@{self.top_k}': ndcg_sum / total,
             'gen_valid_sid_rate':    valid_sid / total,
             'gen_avg_latency_ms':    sum(latencies) / len(latencies),
         }
@@ -459,6 +463,7 @@ class LLMFinetune:
         hit_at_k = 0
         recall_at_k = 0
         mrr_sum = 0.0
+        ndcg_sum = 0.0
         valid_sid = 0
         latencies = []
 
@@ -520,12 +525,14 @@ class LLMFinetune:
                 recall_at_k += 1
                 rank = top_k_candidates.index(ground_truth) + 1
                 mrr_sum += 1.0 / rank
+                ndcg_sum += 1.0 / math.log2(rank + 1)
 
         total = eval_generation_samples
         results['eval_exact_match_rate'] = exact_match / total
         results[f'eval_hit@{top_k}'] = hit_at_k / total
         results[f'eval_recall@{top_k}'] = recall_at_k / total
         results[f'eval_mrr@{top_k}'] = mrr_sum / total
+        results[f'eval_ndcg@{top_k}'] = ndcg_sum / total
         results['eval_valid_sid_rate'] = valid_sid / total
         results['eval_avg_latency_ms'] = sum(latencies) / len(latencies)
 
@@ -535,6 +542,7 @@ class LLMFinetune:
         print(f"hit@{top_k}: {results[f'eval_hit@{top_k}']:.4f}")
         print(f"recall@{top_k}: {results[f'eval_recall@{top_k}']:.4f}")
         print(f"mrr@{top_k}: {results[f'eval_mrr@{top_k}']:.4f}")
+        print(f"ndcg@{top_k}: {results[f'eval_ndcg@{top_k}']:.4f}")
         print(f"valid_sid_rate: {results['eval_valid_sid_rate']:.4f}")
         print(f"avg_latency_ms: {results['eval_avg_latency_ms']:.2f}")
         
