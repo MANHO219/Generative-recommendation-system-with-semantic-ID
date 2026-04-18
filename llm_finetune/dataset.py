@@ -462,7 +462,7 @@ class DatasetBuilder:
         min_user_interactions = int(DATA_CONFIG.get('min_user_interactions', 2))
         min_user_interactions = max(2, min_user_interactions)
 
-        grouped = reviews_df.sort_values(['user_id', 'date']).groupby('user_id')
+        grouped = reviews_df.sort_values(['user_id', 'pseudo_session_trajectory_id', 'date']).groupby(['user_id', 'pseudo_session_trajectory_id'])
         total_groups = len(grouped)
         kept_user_count = 0
 
@@ -472,7 +472,7 @@ class DatasetBuilder:
             'test': [],
         }
 
-        for user_id, group in grouped:
+        for (user_id, trajectory_id), group in grouped:
             group = group.sort_values('date')
 
             visits = []
@@ -500,7 +500,8 @@ class DatasetBuilder:
                     'sid': _to_angle_bracket_sid(semantic_ids[business_id]),
                 })
 
-            if len(visits) < min_user_interactions:
+            # 每个 trajectory 内至少需要 2 个点才能形成 (history -> target)
+            if len(visits) < 2:
                 continue
             kept_user_count += 1
 
